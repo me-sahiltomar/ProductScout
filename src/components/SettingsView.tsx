@@ -6,31 +6,36 @@ import {
   ShieldCheck,
   KeyRound,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
-import { SystemSettings } from '@/types';
+import { SystemSettings, DiscoveredModel } from '@/types';
+import { FALLBACK_GEMINI_MODELS } from '@/lib/engine/geminiModelDiscovery';
 
 interface SettingsViewProps {
   settings: SystemSettings;
   onSaveSettings: (settings: Partial<SystemSettings>) => Promise<void>;
 }
 
-export const GEMINI_MODELS = [
-  { id: 'gemini-3.8-flash', label: 'gemini-3.8-flash (Recommended • Agentic Workhorse & Coding)' },
-  { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash (Fast Multimodal Reasoning)' },
-  { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro (Complex Frontier Reasoning)' },
-  { id: 'gemini-2.0-flash', label: 'gemini-2.0-flash (Next-Gen Fast)' },
-  { id: 'gemini-1.5-flash', label: 'gemini-1.5-flash (Legacy Fast)' },
-  { id: 'gemini-1.5-pro', label: 'gemini-1.5-pro (Legacy Pro)' },
-];
-
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   onSaveSettings,
 }) => {
   const [provider, setProvider] = useState<'heuristic' | 'gemini' | 'openai'>(settings.aiProvider || 'heuristic');
-  const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3.8-flash');
+  const [geminiModelsList, setGeminiModelsList] = useState<DiscoveredModel[]>(
+    settings.availableGeminiModels && settings.availableGeminiModels.length > 0
+      ? settings.availableGeminiModels
+      : FALLBACK_GEMINI_MODELS
+  );
+  const [geminiModel, setGeminiModel] = useState(
+    settings.geminiModel || settings.recommendedGeminiModel || FALLBACK_GEMINI_MODELS[0].id
+  );
   const [isCustomGemini, setIsCustomGemini] = useState(false);
+  const [refreshingModels, setRefreshingModels] = useState(false);
+  const [discoverySource, setDiscoverySource] = useState<'live' | 'fallback'>(
+    settings.hasServerGeminiKey ? 'live' : 'fallback'
+  );
+
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState(settings.openaiBaseUrl || 'https://api.openai.com/v1');
   const [openaiModel, setOpenaiModel] = useState(settings.openaiModel || 'gpt-4o-mini');
   const [defaultMaxSources, setDefaultMaxSources] = useState(settings.defaultMaxSources || 30);
@@ -41,14 +46,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   useEffect(() => {
     setProvider(settings.aiProvider || 'heuristic');
-    const model = settings.geminiModel || 'gemini-3.8-flash';
-    setGeminiModel(model);
-    setIsCustomGemini(!GEMINI_MODELS.some(m => m.id === model));
+    const available = settings.availableGeminiModels && settings.availableGeminiModels.length > 0
+      ? settings.availableGeminiModels
+      : FALLBACK_GEMINI_MODELS;
+    setGeminiModelsList(available);
+
+    const topRecommended = settings.recommendedGeminiModel || available[0]?.id || 'gemini-3.8-flash';
+    const chosenModel = settings.geminiModel || topRecommended;
+    setGeminiModel(chosenModel);
+    setIsCustomGemini(!available.some(m => m.id === chosenModel));
+    setDiscoverySource(settings.hasServerGeminiKey ? 'live' : 'fallback');
+
     setOpenaiBaseUrl(settings.openaiBaseUrl || 'https://api.openai.com/v1');
     setOpenaiModel(settings.openaiModel || 'gpt-4o-mini');
     setDefaultMaxSources(settings.defaultMaxSources || 30);
     setDefaultTimeframe(settings.defaultTimeframe || '30d');
   }, [settings]);
+
+  const handleRefreshModels = async () => {
+    setRefreshingModels(true);
+    try {
+      const res = await fetch('/api/models/gemini?refresh=true');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.models && data.models.length > 0) {
+          setGeminiModelsList(data.models);
+          setDiscoverySource(data.source);
+          if (!isCustomGemini) {
+            setGeminiModel(data.recommendedModel);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to refresh Gemini models:', err);
+    } finally {
+      setRefreshingModels(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,24 +181,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {provider === 'gemini' && (
             <div className="p-4 rounded-xl bg-black/60 border border-white/[0.07] space-y-3">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs text-zinc-300">
-                    Gemini Model
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isCustomGemini) {
-                        setIsCustomGemini(true);
-                      } else {
-                        setIsCustomGemini(false);
-                        setGeminiModel('gemini-3.8-flash');
-                      }
-                    }}
-                    className="text-[11px] text-zinc-400 hover:text-white transition-colors"
-                  >
-                    {isCustomGemini ? 'Switch to preset models' : 'Custom model ID'}
-                  </button>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <label className="block text-xs text-zinc-300 font-medium">
+                      Gemini Model
+                    </label>
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                      discoverySource === 'live' 
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                        : 'bg-white/[0.04] text-zinc-400 border border-white/[0.08]'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${discoverySource === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
+                      {discoverySource === 'live' ? 'Live API Models' : 'Preset Models'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    {settings.hasServerGeminiKey && (
+                      <button
+                        type="button"
+                        onClick={handleRefreshModels}
+                        disabled={refreshingModels}
+                        title="Query Google API for active models on your key"
+                        className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${refreshingModels ? 'animate-spin text-white' : ''}`} />
+                        <span>{refreshingModels ? 'Checking...' : 'Refresh from API key'}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isCustomGemini) {
+                          setIsCustomGemini(true);
+                        } else {
+                          setIsCustomGemini(false);
+                          setGeminiModel(geminiModelsList[0]?.id || 'gemini-3.8-flash');
+                        }
+                      }}
+                      className="text-[11px] text-zinc-400 hover:text-white transition-colors"
+                    >
+                      {isCustomGemini ? 'Preset models' : 'Custom model ID'}
+                    </button>
+                  </div>
                 </div>
 
                 {!isCustomGemini ? (
@@ -177,14 +236,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         setGeminiModel(e.target.value);
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-lg bg-black/80 border border-white/[0.08] text-xs text-zinc-200 focus:outline-none focus:border-white/30"
+                    className="w-full px-3 py-2 rounded-lg bg-black/80 border border-white/[0.08] text-xs text-zinc-200 focus:outline-none focus:border-white/30 font-mono"
                   >
-                    {GEMINI_MODELS.map((m) => (
+                    {geminiModelsList.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.label}
+                        {m.id} {m.badge ? `(${m.badge})` : ''}
                       </option>
                     ))}
-                    <option value="custom">Custom model identifier...</option>
+                    <option value="custom">Specify Custom Model Identifier...</option>
                   </select>
                 ) : (
                   <div className="space-y-1.5">
@@ -200,6 +259,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </p>
                   </div>
                 )}
+
+                {geminiModelsList.find(m => m.id === geminiModel)?.description && (
+                  <p className="text-[11px] text-zinc-500 mt-1.5 leading-normal">
+                    {geminiModelsList.find(m => m.id === geminiModel)?.description}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs">
@@ -207,7 +272,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span className="text-zinc-300">
-                      Server Environment Active: <code className="text-[11px] text-zinc-200 bg-white/[0.06] px-1 py-0.5 rounded font-mono">GEMINI_API_KEY</code> detected.
+                      Server Environment Active: <code className="text-[11px] text-zinc-200 bg-white/[0.06] px-1 py-0.5 rounded font-mono">GEMINI_API_KEY</code> detected. Active models queried in real-time.
                     </span>
                   </>
                 ) : (

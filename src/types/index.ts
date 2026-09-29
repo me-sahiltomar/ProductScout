@@ -546,6 +546,15 @@ export interface ResearchRun {
   error?: string;
 }
 
+export interface DiscoveredModel {
+  id: string;
+  displayName: string;
+  description: string;
+  isRecommended?: boolean;
+  badge?: string;
+  score: number;
+}
+
 export interface SystemSettings {
   aiProvider: 'heuristic' | 'gemini' | 'openai';
   geminiModel?: string;
@@ -555,4 +564,7 @@ export interface SystemSettings {
   defaultTimeframe: '7d' | '30d' | '90d' | '1y' | 'all';
   hasServerGeminiKey?: boolean;
   hasServerOpenaiKey?: boolean;
+  availableGeminiModels?: DiscoveredModel[];
+  recommendedGeminiModel?: string;
 }
+

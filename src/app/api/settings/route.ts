@@ -3,6 +3,7 @@ import { ProductScoutRepository } from '@/lib/db/productScoutRepository';
 import { SystemSettings } from '@/types';
 import { getAuthContext } from '@/lib/auth/serverAuth';
 import { apiRateLimiter } from '@/lib/security/rateLimiter';
+import { fetchAvailableGeminiModels } from '@/lib/engine/geminiModelDiscovery';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,12 +17,17 @@ export async function GET(req: NextRequest) {
       organizationId: auth.organizationId,
     };
 
-    const settings = await repo.getSettings(scope);
+    const [settings, modelDiscovery] = await Promise.all([
+      repo.getSettings(scope),
+      fetchAvailableGeminiModels(),
+    ]);
 
     const responseData: SystemSettings = {
       ...settings,
       hasServerGeminiKey: Boolean(process.env.GEMINI_API_KEY),
       hasServerOpenaiKey: Boolean(process.env.OPENAI_API_KEY),
+      availableGeminiModels: modelDiscovery.models,
+      recommendedGeminiModel: modelDiscovery.recommendedModel,
     };
 
     return NextResponse.json(responseData);
@@ -68,7 +74,10 @@ export async function POST(req: NextRequest) {
       organizationId: auth.organizationId,
     };
 
-    const updated = await repo.updateSettings(safeUpdates, scope);
+    const [updated, modelDiscovery] = await Promise.all([
+      repo.updateSettings(safeUpdates, scope),
+      fetchAvailableGeminiModels(),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -76,6 +85,8 @@ export async function POST(req: NextRequest) {
         ...updated,
         hasServerGeminiKey: Boolean(process.env.GEMINI_API_KEY),
         hasServerOpenaiKey: Boolean(process.env.OPENAI_API_KEY),
+        availableGeminiModels: modelDiscovery.models,
+        recommendedGeminiModel: modelDiscovery.recommendedModel,
       },
     });
   } catch (err: any) {
