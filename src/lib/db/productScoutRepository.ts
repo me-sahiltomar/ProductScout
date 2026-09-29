@@ -14,6 +14,8 @@ import {
 } from '@/types';
 import { getSupabaseAdminClient, isSupabaseConfigured } from './supabaseClient';
 import { Database as LocalDatabase } from './database';
+import { normalizeBrief } from '../engine/opportunityGenerator';
+import { resolveAdaptiveOutputType } from '../engine/reportGenerator';
 
 export interface RunSummary {
   id: string;
@@ -160,6 +162,16 @@ export class ProductScoutRepository {
       const run = this.localDb.getRunById(id) || null;
       if (run) {
         run.is_reference = run.id === 'run_sample_ai_automation_smb' || Boolean(run.is_reference);
+        if (!run.brief) {
+          run.brief = run.config.brief || normalizeBrief(run.config);
+        }
+        if (!run.adaptiveOutputType) {
+          run.adaptiveOutputType = resolveAdaptiveOutputType(run.brief);
+        }
+        run.opportunities = (run.opportunities || []).map(o => ({
+          ...o,
+          opportunityType: o.opportunityType || 'SaaS',
+        }));
       }
       return run;
     }
@@ -339,6 +351,8 @@ export class ProductScoutRepository {
           evidenceConfidence: Number(o.evidence_confidence) || 0,
           clusterId: o.cluster_id || undefined,
           mvpProfile: (o.mvp_profile as any) || {},
+          opportunityType: (o.opportunity_type as any) || 'SaaS',
+          evaluation: (o.evaluation as any) || undefined,
           isSaved: savedMeta ? savedMeta.isSaved : Boolean(o.is_saved),
           notes: savedMeta?.notes ?? o.notes ?? undefined,
         };
@@ -374,10 +388,15 @@ export class ProductScoutRepository {
         qualityDistribution: { high: 0, medium: 0, low: 0 },
       };
 
+      const brief = (runRow.brief as any) || (config.brief) || normalizeBrief(config);
+      const adaptiveOutputType = (runRow.adaptive_output_type as any) || resolveAdaptiveOutputType(brief);
+
       return {
         id: runRow.id,
         createdAt: runRow.created_at,
         config,
+        brief,
+        adaptiveOutputType,
         status: runRow.status as any,
         is_reference: runRow.is_reference ?? false,
         currentStep: runRow.current_step || undefined,
@@ -429,6 +448,8 @@ export class ProductScoutRepository {
         coverage: (run.coverage as any) || {},
         report_markdown: run.reportMarkdown || null,
         error: run.error || null,
+        brief: (run.brief || run.config.brief) ? JSON.parse(JSON.stringify(run.brief || run.config.brief)) : null,
+        adaptive_output_type: run.adaptiveOutputType || null,
         created_at: run.createdAt,
         updated_at: new Date().toISOString(),
       });
@@ -580,6 +601,8 @@ export class ProductScoutRepository {
           distribution_difficulty: o.distributionDifficulty,
           evidence_confidence: o.evidenceConfidence,
           mvp_profile: (o.mvpProfile as any) || {},
+          opportunity_type: o.opportunityType || 'SaaS',
+          evaluation: o.evaluation ? JSON.parse(JSON.stringify(o.evaluation)) : null,
           is_saved: Boolean(o.isSaved),
           notes: o.notes || null,
           updated_at: new Date().toISOString(),
@@ -905,6 +928,8 @@ export class ProductScoutRepository {
           evidenceConfidence: Number(o.evidence_confidence) || 0,
           clusterId: o.cluster_id || undefined,
           mvpProfile: (o.mvp_profile as any) || {},
+          opportunityType: (o.opportunity_type as any) || 'SaaS',
+          evaluation: (o.evaluation as any) || undefined,
           isSaved: true,
           notes: savedMeta?.notes || o.notes || undefined,
         };

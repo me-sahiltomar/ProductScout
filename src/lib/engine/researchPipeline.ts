@@ -3,9 +3,9 @@ import { EvidenceFilter } from './evidenceFilter';
 import { ProblemExtractor } from './problemExtractor';
 import { ClusteringEngine } from './clusteringEngine';
 import { SolutionGapAnalyzer } from './solutionGapAnalyzer';
-import { OpportunityGenerator } from './opportunityGenerator';
+import { OpportunityGenerator, normalizeBrief } from './opportunityGenerator';
 import { QualityController } from './qualityController';
-import { ReportGenerator } from './reportGenerator';
+import { ReportGenerator, resolveAdaptiveOutputType } from './reportGenerator';
 import { AIProviderManager } from './aiProvider';
 import { ProductScoutRepository, UserScope } from '../db/productScoutRepository';
 import { ResearchRun, ResearchRunConfig } from '@/types';
@@ -51,10 +51,16 @@ export class ResearchPipeline {
     const runId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const createdAt = new Date().toISOString();
 
+    const brief = config.brief || normalizeBrief(config);
+    config.brief = brief;
+    const adaptiveOutputType = resolveAdaptiveOutputType(brief);
+
     const initialRun: ResearchRun = {
       id: runId,
       createdAt,
       config,
+      brief,
+      adaptiveOutputType,
       status: 'collecting',
       currentStep: 'Collecting user signals across public web sources...',
       coverage: {
@@ -62,7 +68,9 @@ export class ResearchPipeline {
         sourcesCollectedCount: 0,
         sourcesSucceeded: [],
         sourcesUnavailable: [],
-        dateRange: config.timeframe === 'all' ? 'All time' : `Past ${config.timeframe}`,
+        dateRange: brief.researchConfiguration.evidenceWindow === 'all' 
+          ? 'All time' 
+          : `Past ${brief.researchConfiguration.evidenceWindow}`,
         qualityDistribution: { high: 0, medium: 0, low: 0 },
       },
       rawEvidenceCount: 0,
@@ -110,7 +118,7 @@ export class ResearchPipeline {
       const { solutions, gaps } = this.solutionGapAnalyzer.analyze(clusters, problems, classifiedEvidence);
       initialRun.existingSolutions = solutions;
       initialRun.gaps = gaps;
-      initialRun.currentStep = 'Generating 20-field product opportunities and MVP profiles...';
+      initialRun.currentStep = 'Formulating opportunities and contextual evaluation...';
       await this.repo.saveRun(initialRun, scope);
 
       let opportunities = this.opportunityGenerator.generateOpportunities(clusters, problems, gaps, config);
@@ -121,7 +129,7 @@ export class ResearchPipeline {
       const { verifiedOpportunities, weakSignals } = this.qualityController.audit(opportunities, problems, classifiedEvidence);
       initialRun.opportunities = verifiedOpportunities;
       initialRun.weakSignals = weakSignals;
-      initialRun.currentStep = 'Synthesizing final executive report...';
+      initialRun.currentStep = 'Synthesizing adaptive execution report...';
       await this.repo.saveRun(initialRun, scope);
 
       const reportMarkdown = this.reportGenerator.generateMarkdownReport(initialRun);

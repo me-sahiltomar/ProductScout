@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev -p 3002",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3002",
     "lint": "next lint",
-    "test": "node test/e2e_security_verification.mjs"
+    "test": "npx tsx test/v2_architecture_matrix.ts",
+    "test:e2e": "node test/e2e_security_verification.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

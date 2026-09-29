@@ -40,38 +40,49 @@ export async function POST(req: NextRequest) {
 
     // 3. Parse and validate input payload
     const body = await req.json().catch(() => null);
-    if (!body || typeof body.topic !== 'string') {
-      return NextResponse.json({ error: 'Research topic is required' }, { status: 400 });
+    if (!body) {
+      return NextResponse.json({ error: 'Request body is required' }, { status: 400 });
     }
 
-    const trimmedTopic = body.topic.trim();
-    if (trimmedTopic.length < 3 || trimmedTopic.length > 200) {
+    const rawTopic = typeof body.topic === 'string' && body.topic.trim()
+      ? body.topic.trim()
+      : (typeof body.brief?.subject === 'string' ? body.brief.subject.trim() : '');
+
+    if (!rawTopic || rawTopic.length < 3 || rawTopic.length > 250) {
       return NextResponse.json(
-        { error: 'Research topic must be between 3 and 200 characters in length.' },
+        { error: 'Research topic / subject must be between 3 and 250 characters in length.' },
         { status: 400 }
       );
     }
 
     const validTimeframes = ['7d', '30d', '90d', '1y', 'all'] as const;
-    const timeframe = validTimeframes.includes(body.timeframe) ? body.timeframe : '30d';
+    const requestedTimeframe = body.timeframe || body.brief?.researchConfiguration?.evidenceWindow;
+    const timeframe = validTimeframes.includes(requestedTimeframe) ? requestedTimeframe : '30d';
 
-    let maxSources = typeof body.maxSources === 'number' ? Math.floor(body.maxSources) : 30;
+    let maxSources = typeof body.maxSources === 'number' 
+      ? Math.floor(body.maxSources) 
+      : (typeof body.brief?.researchConfiguration?.maxSources === 'number' ? Math.floor(body.brief.researchConfiguration.maxSources) : 30);
     if (maxSources < 5) maxSources = 5;
     if (maxSources > 60) maxSources = 60;
 
     const enabledSources = Array.isArray(body.enabledSources) && body.enabledSources.length > 0
       ? body.enabledSources.filter((s: any) => typeof s === 'string')
-      : ['reddit', 'hackernews', 'github', 'devto', 'web'];
+      : (Array.isArray(body.brief?.researchConfiguration?.sources) && body.brief.researchConfiguration.sources.length > 0
+          ? body.brief.researchConfiguration.sources
+          : ['reddit', 'hackernews', 'github', 'devto', 'web']);
 
     const config: ResearchRunConfig = {
-      topic: trimmedTopic,
+      topic: rawTopic,
       timeframe,
       maxSources,
-      focus: typeof body.focus === 'string' && body.focus.trim() ? body.focus.trim() : 'Workflow inefficiencies and unmet tooling demands',
-      targetUser: typeof body.targetUser === 'string' ? body.targetUser.trim() : undefined,
-      geography: typeof body.geography === 'string' ? body.geography.trim() : undefined,
-      industry: typeof body.industry === 'string' ? body.industry.trim() : undefined,
+      focus: typeof body.focus === 'string' && body.focus.trim() 
+        ? body.focus.trim() 
+        : (body.brief?.intent || body.brief?.target?.workflow || 'Workflow inefficiencies and unmet tooling demands'),
+      targetUser: typeof body.targetUser === 'string' ? body.targetUser.trim() : (body.brief?.target?.primaryUser || body.brief?.target?.targetUser),
+      geography: typeof body.geography === 'string' ? body.geography.trim() : body.brief?.target?.geography,
+      industry: typeof body.industry === 'string' ? body.industry.trim() : body.brief?.target?.industry,
       enabledSources,
+      brief: body.brief || undefined,
     };
 
     // 4. Execute pipeline within user/tenant scope

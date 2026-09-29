@@ -345,6 +345,7 @@ export type Database = {
           created_at: string
           distribution_difficulty: string
           estimated_mvp_build_time: string
+          evaluation: Json | null
           evidence_confidence: number
           evidence_quotes: Json
           evidence_summary: string
@@ -360,6 +361,7 @@ export type Database = {
           name: string
           notes: string | null
           one_line_description: string
+          opportunity_type: string
           product_id: string
           proposed_solution: string
           run_id: string
@@ -376,6 +378,7 @@ export type Database = {
           created_at?: string
           distribution_difficulty: string
           estimated_mvp_build_time: string
+          evaluation?: Json | null
           evidence_confidence?: number
           evidence_quotes?: Json
           evidence_summary: string
@@ -391,6 +394,7 @@ export type Database = {
           name: string
           notes?: string | null
           one_line_description: string
+          opportunity_type?: string
           product_id?: string
           proposed_solution: string
           run_id: string
@@ -407,6 +411,7 @@ export type Database = {
           created_at?: string
           distribution_difficulty?: string
           estimated_mvp_build_time?: string
+          evaluation?: Json | null
           evidence_confidence?: number
           evidence_quotes?: Json
           evidence_summary?: string
@@ -422,6 +427,7 @@ export type Database = {
           name?: string
           notes?: string | null
           one_line_description?: string
+          opportunity_type?: string
           product_id?: string
           proposed_solution?: string
           run_id?: string
@@ -657,6 +663,8 @@ export type Database = {
       }
       productscout_research_runs: {
         Row: {
+          adaptive_output_type: string | null
+          brief: Json | null
           coverage: Json
           created_at: string
           current_step: string | null
@@ -680,6 +688,8 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          adaptive_output_type?: string | null
+          brief?: Json | null
           coverage?: Json
           created_at?: string
           current_step?: string | null
@@ -703,6 +713,8 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          adaptive_output_type?: string | null
+          brief?: Json | null
           coverage?: Json
           created_at?: string
           current_step?: string | null

@@ -16,10 +16,15 @@ import {
   HelpCircle,
   RotateCw,
   TrendingUp,
-  Radio
+  Radio,
+  Sparkles,
+  Target,
+  Sliders,
+  ShieldAlert
 } from 'lucide-react';
 import { ResearchRun, ProductOpportunity } from '@/types';
 import { OpportunityCard } from './OpportunityCard';
+import { ReportGenerator } from '@/lib/engine/reportGenerator';
 
 interface ResultsViewProps {
   run: ResearchRun;
@@ -35,11 +40,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   onStartNewWithSameConfig,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'opportunities' | 'problems' | 'solutions_gaps' | 'evidence' | 'mvp_validation' | 'weak_signals' | 'coverage' | 'report'
-  >('opportunities');
+    'adaptive_brief' | 'opportunities' | 'problems' | 'solutions_gaps' | 'evidence' | 'mvp_validation' | 'weak_signals' | 'coverage' | 'report'
+  >('adaptive_brief');
 
   const [evidenceFilter, setEvidenceFilter] = useState<string>('all');
   const [copiedReport, setCopiedReport] = useState(false);
+  const [copiedBrief, setCopiedBrief] = useState(false);
+
+  const reportGen = new ReportGenerator();
+  const adaptiveBriefText = reportGen.generateAdaptiveBrief(run);
 
   const handleCopyReport = () => {
     navigator.clipboard.writeText(run.reportMarkdown);
@@ -47,12 +56,30 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
     setTimeout(() => setCopiedReport(false), 2000);
   };
 
+  const handleCopyBrief = () => {
+    navigator.clipboard.writeText(adaptiveBriefText);
+    setCopiedBrief(true);
+    setTimeout(() => setCopiedBrief(false), 2000);
+  };
+
   const handleDownloadReport = () => {
     const blob = new Blob([run.reportMarkdown], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `productscout-${run.config.topic.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`;
+    a.download = `productscout-report-${run.config.topic.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadBrief = () => {
+    const blob = new Blob([adaptiveBriefText], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `productscout-brief-${(run.adaptiveOutputType || 'execution').replace(/_/g, '-')}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -78,43 +105,50 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
     return ev.platform === evidenceFilter;
   });
 
+  const brief = run.brief;
+
   return (
-    <div className="space-y-6 pb-20 animate-fade-in">
+    <div className="space-y-6 pb-20 animate-fade-in text-zinc-100">
       {/* Top Banner / Summary Header */}
-      <div className="glass-panel rounded-2xl p-5 sm:p-6">
+      <div className="border border-zinc-800 rounded-xl bg-zinc-950 p-5 sm:p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
-              <span className="badge-mono text-[10px] font-mono px-2 py-0.5 rounded uppercase">
-                Scout Completed
+              <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-200 font-medium">
+                {run.adaptiveOutputType ? run.adaptiveOutputType.replace(/_/g, ' ') : 'General Opportunity Intelligence'}
               </span>
-              <span className="text-xs text-zinc-500 font-mono">
+              {brief && (
+                <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300">
+                  Horizon: {brief.opportunityProfile.buildHorizon}
+                </span>
+              )}
+              <span className="text-xs text-zinc-400 font-mono">
                 {run.coverage.dateRange} • {new Date(run.createdAt).toLocaleDateString()}
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight truncate">
-              {run.config.topic}
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+              {brief?.subject || run.config.topic}
             </h1>
-            {run.config.focus && (
+            {(brief?.intent || run.config.focus) && (
               <p className="text-xs text-zinc-400 mt-1 max-w-3xl truncate">
-                "{run.config.focus}"
+                "{brief?.intent || run.config.focus}"
               </p>
             )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
-              onClick={handleCopyReport}
-              className="btn-secondary px-3 py-1.5 rounded-md text-xs font-medium flex items-center space-x-1.5"
+              onClick={handleCopyBrief}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-200 transition-colors flex items-center space-x-1.5"
             >
-              {copiedReport ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
-              <span>{copiedReport ? 'Copied' : 'Copy Report'}</span>
+              {copiedBrief ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
+              <span>{copiedBrief ? 'Copied Brief' : 'Copy Brief'}</span>
             </button>
 
             <button
               onClick={handleDownloadReport}
-              className="btn-secondary px-3 py-1.5 rounded-md text-xs font-medium flex items-center space-x-1.5"
-              title="Download report in Markdown format"
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-200 transition-colors flex items-center space-x-1.5"
+              title="Download full report in Markdown format"
             >
               <Download className="w-3.5 h-3.5 text-zinc-400" />
               <span>Export MD</span>
@@ -122,7 +156,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 
             <button
               onClick={handleDownloadJson}
-              className="btn-secondary px-3 py-1.5 rounded-md text-xs font-medium flex items-center space-x-1.5"
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-200 transition-colors flex items-center space-x-1.5"
               title="Download full intelligence run data in JSON format"
             >
               <Download className="w-3.5 h-3.5 text-zinc-400" />
@@ -131,7 +165,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 
             <button
               onClick={onStartNewWithSameConfig}
-              className="btn-primary px-3.5 py-1.5 rounded-md text-xs flex items-center space-x-1.5"
+              className="px-3.5 py-1.5 rounded-md text-xs font-semibold bg-white text-black hover:bg-zinc-200 transition-colors flex items-center space-x-1.5 shadow-sm"
             >
               <RotateCw className="w-3.5 h-3.5" />
               <span>Re-Run</span>
@@ -139,27 +173,46 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
         </div>
 
+        {/* Quick Context Summary Chips */}
+        {brief && (
+          <div className="mt-4 pt-3.5 border-t border-zinc-900 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-[11px] font-mono text-zinc-500 uppercase">Context:</span>
+            <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-850 text-zinc-300 text-[11px]">
+              Target: {brief.target.primaryUser || 'Operators'} ({brief.target.targetCompany || 'SMB'})
+            </span>
+            <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-850 text-zinc-300 text-[11px]">
+              Team: {brief.opportunityProfile.teamSize} ({brief.opportunityProfile.technicalCapability})
+            </span>
+            <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-850 text-zinc-300 text-[11px]">
+              Budget: {brief.opportunityProfile.budget}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-850 text-zinc-300 text-[11px]">
+              Risk Profile: {brief.constraints.riskProfile}
+            </span>
+          </div>
+        )}
+
         {/* Quick Metrics Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-white/[0.06]">
-          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-zinc-900">
+          <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/80">
             <span className="text-[10px] font-mono uppercase text-zinc-500 block">Sources Evaluated</span>
             <span className="text-lg font-semibold text-white">{run.coverage.sourcesCollectedCount}</span>
             <span className="text-[10px] text-zinc-500 ml-1">across {run.coverage.sourcesSucceeded.length} platforms</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/80">
             <span className="text-[10px] font-mono uppercase text-zinc-500 block">Verified Problems</span>
             <span className="text-lg font-semibold text-white">{run.problems.length}</span>
             <span className="text-[10px] text-zinc-500 ml-1">in {run.clusters.length} clusters</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/80">
             <span className="text-[10px] font-mono uppercase text-zinc-500 block">Product Opportunities</span>
             <span className="text-lg font-semibold text-white">{run.opportunities.length}</span>
-            <span className="text-[10px] text-zinc-500 ml-1">passed 10-point QC</span>
+            <span className="text-[10px] text-zinc-500 ml-1">evaluated & scored</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/80">
             <span className="text-[10px] font-mono uppercase text-zinc-500 block">Weak Signals</span>
             <span className="text-lg font-semibold text-zinc-400">{run.weakSignals.length}</span>
             <span className="text-[10px] text-zinc-500 ml-1">segregated</span>
@@ -168,9 +221,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
       </div>
 
       {/* Main Tabs Navigation */}
-      <div className="border-b border-white/[0.08] overflow-x-auto">
+      <div className="border-b border-zinc-800 overflow-x-auto">
         <nav className="flex space-x-1 sm:space-x-2 min-w-max pb-px">
           {[
+            { id: 'adaptive_brief', label: 'Adaptive Execution Output', icon: Sparkles },
             { id: 'opportunities', label: `Opportunities (${run.opportunities.length})`, icon: TrendingUp },
             { id: 'problems', label: `Problems & Clusters (${run.problems.length})`, icon: AlertCircle },
             { id: 'solutions_gaps', label: `Solutions & Gaps (${run.gaps.length})`, icon: Layers },
@@ -178,7 +232,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             { id: 'mvp_validation', label: 'MVP & Validation', icon: Clock },
             { id: 'weak_signals', label: `Weak Signals (${run.weakSignals.length})`, icon: HelpCircle },
             { id: 'coverage', label: 'Research Coverage', icon: Radio },
-            { id: 'report', label: 'Executive Report', icon: FileText },
+            { id: 'report', label: 'Full Markdown Report', icon: FileText },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -188,7 +242,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-all duration-150 ${
                   active
-                    ? 'border-white text-white'
+                    ? 'border-white text-white font-semibold'
                     : 'border-transparent text-zinc-400 hover:text-white'
                 }`}
               >
@@ -200,14 +254,50 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
         </nav>
       </div>
 
+      {/* TAB 0: ADAPTIVE EXECUTION BRIEF */}
+      {activeTab === 'adaptive_brief' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-white tracking-tight">
+                Context-Adaptive Execution Document
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Tailored execution plan synthesized strictly for your objective, horizon ({brief?.opportunityProfile.buildHorizon || 'N/A'}), and resource profile.
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleCopyBrief}
+                className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 transition-colors flex items-center space-x-1"
+              >
+                {copiedBrief ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
+                <span>{copiedBrief ? 'Copied' : 'Copy Brief'}</span>
+              </button>
+              <button
+                onClick={handleDownloadBrief}
+                className="px-3 py-1.5 rounded-md text-xs font-semibold bg-white text-black hover:bg-zinc-200 transition-colors flex items-center space-x-1"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Brief</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="border border-zinc-800 rounded-xl bg-zinc-950 p-6 font-mono text-xs text-zinc-200 whitespace-pre-wrap leading-relaxed max-h-[75vh] overflow-y-auto">
+            {adaptiveBriefText}
+          </div>
+        </div>
+      )}
+
       {/* TAB 1: PRODUCT OPPORTUNITIES */}
       {activeTab === 'opportunities' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-white tracking-tight">Synthesized Opportunities</h2>
+              <h2 className="text-sm font-semibold text-white tracking-tight">Formulated & Evaluated Opportunities</h2>
               <p className="text-xs text-zinc-400">
-                Audited against 10-point QC criteria and grounded in real operator pain points.
+                Grounded in bottom-up user evidence and evaluated against your research brief.
               </p>
             </div>
             <span className="text-xs font-mono text-zinc-500">
@@ -243,64 +333,54 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               const clusterProblems = run.problems.filter(p => cluster.problemIds.includes(p.id));
 
               return (
-                <div key={cluster.id} className="glass-panel rounded-2xl p-5 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+                <div key={cluster.id} className="border border-zinc-800 rounded-xl bg-zinc-950 p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-850 pb-3">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="badge-mono text-[10px] font-mono uppercase px-2 py-0.5 rounded text-white font-medium">
-                          {cluster.overallEvidenceStrength} Evidence
+                        <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-200 font-medium">
+                          Cluster
                         </span>
-                        <h3 className="text-sm sm:text-base font-semibold text-white">
-                          {cluster.clusterName}
-                        </h3>
+                        <h3 className="text-sm font-semibold text-white">{cluster.clusterName}</h3>
                       </div>
                       <p className="text-xs text-zinc-400 mt-1">{cluster.description}</p>
                     </div>
 
-                    <div className="flex items-center space-x-2.5 text-xs font-mono text-zinc-500">
-                      <span>{cluster.signalCount} Signals</span>
+                    <div className="flex items-center space-x-2 text-xs font-mono text-zinc-500 shrink-0">
+                      <span>{cluster.signalCount} signals</span>
                       <span>•</span>
-                      <span>{cluster.sourceDiversity} Platform(s)</span>
+                      <span>{cluster.sourceDiversity} platforms</span>
+                      <span>•</span>
+                      <span className="text-zinc-300 font-medium">{cluster.overallEvidenceStrength}</span>
                     </div>
                   </div>
 
-                  {/* Child Problems */}
-                  <div className="space-y-2.5 pt-1">
-                    {clusterProblems.map((p, idx) => (
-                      <div key={p.id} className="p-3.5 rounded-xl bg-black/60 border border-white/[0.06] space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <h4 className="text-xs sm:text-sm font-medium text-zinc-200">
-                            {idx + 1}. {p.problemStatement}
-                          </h4>
-                          <span className="badge-mono text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0">
-                            {p.frequency}
+                  <div className="space-y-3">
+                    {clusterProblems.map((prob) => (
+                      <div key={prob.id} className="p-3.5 rounded-lg bg-zinc-900/50 border border-zinc-800 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-xs font-semibold text-white">{prob.problemStatement}</h4>
+                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 shrink-0">
+                            {prob.signalCount} signal(s)
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-zinc-400">
                           <div>
-                            <span className="text-[10px] font-mono uppercase text-zinc-500 block">Affected User</span>
-                            <span className="text-zinc-300">{p.targetUser}</span>
+                            <span className="text-zinc-500 font-mono text-[10px] uppercase block">Target User:</span>
+                            <span>{prob.targetUser}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-mono uppercase text-zinc-500 block">Workaround</span>
-                            <span className="text-zinc-200 font-medium">{p.currentWorkaround}</span>
+                            <span className="text-zinc-500 font-mono text-[10px] uppercase block">Job / Workflow:</span>
+                            <span>{prob.jobWorkflow}</span>
                           </div>
                         </div>
 
-                        {p.evidenceQuotes[0] && (
-                          <div className="p-2.5 rounded-lg bg-black/80 border border-white/[0.05] text-xs italic text-zinc-300 flex items-start space-x-2 font-mono">
-                            <span className="truncate">"{p.evidenceQuotes[0].quote}"</span>
-                            <a
-                              href={p.evidenceQuotes[0].sourceUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-zinc-400 hover:text-white shrink-0 ml-auto not-italic transition-colors"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
+                        <div className="p-2 rounded bg-black/60 border border-zinc-850 text-xs text-zinc-300 space-y-1">
+                          <div>
+                            <span className="text-zinc-500 font-mono text-[10px] uppercase block">Makeshift Workaround:</span>
+                            <span>{prob.currentWorkaround}</span>
                           </div>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -313,74 +393,67 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 
       {/* TAB 3: SOLUTIONS & GAPS */}
       {activeTab === 'solutions_gaps' && (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-sm font-semibold text-white tracking-tight">Existing Solutions & Gaps</h2>
-            <p className="text-xs text-zinc-400">
-              Investigation of incumbents and workarounds. Real evidence is strictly distinguished from AI inference.
-            </p>
-          </div>
-
+        <div className="space-y-6">
+          {/* Market Gaps */}
           <div className="space-y-3">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-              Market Gaps
-            </h3>
+            <div>
+              <h2 className="text-sm font-semibold text-white tracking-tight">Identified Market Gaps</h2>
+              <p className="text-xs text-zinc-400">
+                White spaces where current solutions fail or leave operators underserved.
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {run.gaps.map((gap) => (
-                <div key={gap.id} className="glass-card p-4 rounded-xl space-y-2">
+                <div key={gap.id} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="badge-mono text-[10px] font-mono uppercase px-2 py-0.5 rounded">
-                      {gap.gapType.replace(/_/g, ' ')}
+                    <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300 font-medium">
+                      {gap.gapType}
                     </span>
-                    <span className="badge-mono text-[10px] font-mono px-2 py-0.5 rounded text-white font-medium">
-                      {gap.isAiInference ? 'AI Inference' : 'Evidence-Backed'}
+                    <span className={`text-[10px] font-mono ${gap.isAiInference ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {gap.isAiInference ? 'Market Inference' : 'Evidence-Backed'}
                     </span>
                   </div>
 
-                  <h4 className="text-xs sm:text-sm font-medium text-white">{gap.title}</h4>
-                  <p className="text-xs text-zinc-300 leading-relaxed">{gap.description}</p>
-
-                  {gap.supportingQuotes.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-white/[0.06] text-[11px] italic text-zinc-400 font-mono">
-                      "{gap.supportingQuotes[0]}"
-                    </div>
-                  )}
+                  <h3 className="text-xs font-semibold text-white">{gap.title}</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">{gap.description}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="space-y-3 pt-4 border-t border-white/[0.08]">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-              Incumbents & Workarounds
-            </h3>
+          {/* Incumbents */}
+          <div className="space-y-3 pt-4 border-t border-zinc-800">
+            <div>
+              <h2 className="text-sm font-semibold text-white tracking-tight">Incumbent Solutions & Workarounds</h2>
+              <p className="text-xs text-zinc-400">
+                Tools currently used by operators and documented user complaints.
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {run.existingSolutions.map((sol, idx) => (
-                <div key={idx} className="glass-card p-4 rounded-xl space-y-2.5">
+              {run.existingSolutions.map((sol, i) => (
+                <div key={i} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs sm:text-sm font-medium text-white">{sol.name}</h4>
-                    <span className="badge-mono text-[10px] font-mono uppercase px-2 py-0.5 rounded">
-                      {sol.type.replace('_', ' ')}
+                    <h3 className="text-xs font-semibold text-white">{sol.name}</h3>
+                    <span className="font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400">
+                      {sol.type}
                     </span>
                   </div>
 
-                  <p className="text-xs text-zinc-300">
-                    <span className="text-zinc-500 font-mono text-[10px] uppercase block">Usage:</span>
-                    {sol.whatUsersDo}
-                  </p>
-
-                  <div className="space-y-1 text-xs pt-1">
-                    <div className="text-zinc-300">
-                      <span className="text-zinc-500 font-mono text-[10px] uppercase">Complaints:</span> {sol.complaints.join('; ')}
-                    </div>
-                    <div className="text-zinc-400">
-                      <span className="text-zinc-500 font-mono text-[10px] uppercase">Missing:</span> {sol.missingFunctionality.join('; ')}
-                    </div>
+                  <div className="text-xs text-zinc-300">
+                    <span className="text-zinc-500 font-mono text-[10px] uppercase block">What Users Currently Do:</span>
+                    <span>{sol.whatUsersDo}</span>
                   </div>
 
-                  {sol.pricingInfo && (
-                    <div className="text-[11px] font-mono text-zinc-500 pt-1.5 border-t border-white/[0.06]">
-                      Pricing: {sol.pricingInfo}
+                  {sol.complaints.length > 0 && (
+                    <div className="p-2.5 rounded bg-zinc-900/60 border border-zinc-850 text-xs text-red-300/90 space-y-1">
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase block">Reported Friction Points:</span>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {sol.complaints.map((c, idx) => (
+                          <li key={idx} className="line-clamp-2">{c}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </div>
@@ -395,74 +468,62 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-white tracking-tight">Evidence Feed</h2>
+              <h2 className="text-sm font-semibold text-white tracking-tight">Classified Public Evidence</h2>
               <p className="text-xs text-zinc-400">
-                Direct operator quotes preserving platform, original URL, and authenticity scores.
+                Ranked by first-hand authenticity and quality metrics.
               </p>
             </div>
 
-            <div className="flex items-center space-x-2 text-xs">
-              <span className="text-zinc-500 font-mono">Filter:</span>
-              <select
-                value={evidenceFilter}
-                onChange={(e) => setEvidenceFilter(e.target.value)}
-                className="px-2.5 py-1 rounded-lg bg-black/70 border border-white/[0.08] text-zinc-200 text-xs focus:outline-none focus:border-white/30"
-              >
-                <option value="all">All Sources ({run.classifiedEvidence.length})</option>
-                <option value="high">High Quality Only</option>
-                <option value="reddit">Reddit</option>
-                <option value="hacker_news">Hacker News</option>
-                <option value="github">GitHub</option>
-                <option value="devto">Dev.to</option>
-                <option value="web">Web</option>
-              </select>
+            <div className="flex items-center space-x-1.5 text-xs">
+              <span className="text-zinc-500 font-mono text-[11px] mr-1">Filter:</span>
+              {['all', 'high', 'reddit', 'hacker_news', 'github'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setEvidenceFilter(f)}
+                  className={`px-2 py-1 rounded text-[11px] font-mono uppercase transition-colors ${
+                    evidenceFilter === f
+                      ? 'bg-white text-black font-semibold'
+                      : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="space-y-2.5">
             {filteredEvidence.map((ev) => (
-              <div
-                key={ev.id}
-                className="glass-card p-3.5 rounded-xl space-y-2"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
+              <div key={ev.id} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
                   <div className="flex items-center space-x-2">
-                    <span className="badge-mono text-[10px] font-mono uppercase px-2 py-0.5 rounded text-white font-medium">
-                      {ev.platform}
-                    </span>
-                    <span className="text-xs font-medium text-zinc-200">
-                      {ev.title}
+                    <span className="font-mono uppercase font-semibold text-zinc-300">{ev.platform}</span>
+                    <span className="text-zinc-600">•</span>
+                    <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                      ev.quality === 'HIGH' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-zinc-900 text-zinc-400'
+                    }`}>
+                      {ev.quality} ({ev.qualityScore}/100)
                     </span>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <span className="badge-mono text-[10px] font-mono px-2 py-0.5 rounded">
-                      Score: {ev.qualityScore}/100
-                    </span>
-
-                    <a
-                      href={ev.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
-                      title="Open source URL"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
+                  <a
+                    href={ev.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center space-x-1 text-zinc-400 hover:text-white transition-colors"
+                  >
+                    <span>Original Source</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
 
-                <p className="text-xs text-zinc-300 font-mono bg-black/80 p-2.5 rounded-lg border border-white/[0.05] leading-relaxed">
+                <p className="text-xs text-zinc-200 leading-relaxed font-mono bg-black/60 p-3 rounded-lg border border-zinc-850 italic">
                   "{ev.painQuote || ev.snippet}"
                 </p>
 
-                <div className="flex flex-wrap items-center justify-between text-[11px] text-zinc-500 pt-0.5">
+                <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
                   <span>Author: {ev.author || 'Anonymous'}</span>
-                  {ev.firstHandMarkers.length > 0 && (
-                    <span className="font-mono text-[10px] text-zinc-400">
-                      Markers: {ev.firstHandMarkers.join(', ')}
-                    </span>
-                  )}
+                  <span>{ev.date || 'Recent'}</span>
                 </div>
               </div>
             ))}
@@ -474,66 +535,35 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
       {activeTab === 'mvp_validation' && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-sm font-semibold text-white tracking-tight">Narrow MVP Profiles & Validation Experiments</h2>
+            <h2 className="text-sm font-semibold text-white tracking-tight">MVP Profiles & Validation Experiments</h2>
             <p className="text-xs text-zinc-400">
-              Smallest testable footprints to verify willingness-to-pay within 1–2 weeks.
+              Calibrated build scopes and concrete experiments designed to test critical uncertainties.
             </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {run.opportunities.map((opp) => (
-              <div key={opp.id} className="glass-panel p-5 rounded-2xl space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">{opp.name}</h3>
-                    <p className="text-xs text-zinc-400">{opp.oneLineDescription}</p>
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs font-mono">
-                    <span className="badge-mono px-2 py-0.5 rounded">
-                      {opp.estimatedMvpBuildTime}
-                    </span>
-                    <span className="badge-mono px-2 py-0.5 rounded">
-                      {opp.technicalComplexity} Complexity
-                    </span>
-                  </div>
+              <div key={opp.id} className="p-5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-zinc-850 pb-2">
+                  <h3 className="text-xs font-semibold text-white">{opp.name}</h3>
+                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300">
+                    {opp.estimatedMvpBuildTime}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-xl bg-black/60 border border-white/[0.06] space-y-2">
-                    <span className="text-xs font-medium text-white block">
-                      Must-Have Scope
-                    </span>
-                    <ul className="text-xs space-y-1 text-zinc-300">
-                      {opp.mvpScope.map((s, i) => (
-                        <li key={i}>• {s}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-black/60 border border-white/[0.06] space-y-2">
-                    <span className="text-xs font-medium text-zinc-400 block">
-                      Anti-Scope (Do Not Build Initially)
-                    </span>
-                    <ul className="text-xs space-y-1 text-zinc-400">
-                      {opp.whatNotToBuildInitially.map((s, i) => (
-                        <li key={i}>✕ {s}</li>
-                      ))}
-                    </ul>
-                  </div>
+                <div>
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase block mb-1">Validation Test</span>
+                  <p className="text-xs text-zinc-200">{opp.validationExperiment.test}</p>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-black/60 border border-white/[0.06] space-y-2">
-                  <span className="text-xs font-medium text-zinc-300 block">Concrete Validation Experiment</span>
-                  <div className="text-xs text-zinc-300">
-                    <span className="text-zinc-500 font-mono text-[10px] uppercase">Test:</span> {opp.validationExperiment.test}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
+                    <span className="text-[10px] font-mono text-emerald-400 uppercase block mb-0.5">Success Signal</span>
+                    <span className="text-zinc-300 text-[11px]">{opp.validationExperiment.successSignal}</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
-                    <div className="text-zinc-200">
-                      <span className="text-zinc-500 font-mono text-[10px] uppercase">Success Signal:</span> {opp.validationExperiment.successSignal}
-                    </div>
-                    <div className="text-zinc-400">
-                      <span className="text-zinc-500 font-mono text-[10px] uppercase">Kill Signal:</span> {opp.validationExperiment.invalidationSignal}
-                    </div>
+                  <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
+                    <span className="text-[10px] font-mono text-red-400 uppercase block mb-0.5">Kill Signal</span>
+                    <span className="text-zinc-400 text-[11px]">{opp.validationExperiment.invalidationSignal}</span>
                   </div>
                 </div>
               </div>
@@ -548,32 +578,29 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           <div>
             <h2 className="text-sm font-semibold text-white tracking-tight">Weak / Insufficient Signals</h2>
             <p className="text-xs text-zinc-400">
-              Unverified complaints and single-source issues that failed 10-point QC.
+              Discussions and complaints that lacked corroboration across multiple platforms or failed verification.
             </p>
           </div>
 
           {run.weakSignals.length === 0 ? (
-            <div className="glass-panel p-6 rounded-xl text-center text-zinc-500 text-xs">
-              No weak signals flagged. All problems satisfied verification thresholds.
+            <div className="p-8 text-center border border-zinc-800 rounded-xl bg-zinc-950 text-zinc-400 text-xs">
+              No weak signals segregated for this run; all discovered friction points met multi-source verification standards.
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {run.weakSignals.map((ws) => (
-                <div key={ws.id} className="glass-card p-3.5 rounded-xl space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-medium text-zinc-200">{ws.title}</h4>
-                    <span className="badge-mono text-[10px] font-mono uppercase px-2 py-0.5 rounded">
-                      {ws.platform}
-                    </span>
+                <div key={ws.id} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-mono text-zinc-400 uppercase">{ws.platform}</span>
+                    <a href={ws.sourceUrl} target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-white flex items-center space-x-1">
+                      <span>Source</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-                  <p className="text-xs text-zinc-300 italic font-mono bg-black/70 p-2.5 rounded-lg border border-white/[0.05]">
-                    "{ws.userStatement}"
-                  </p>
-                  <div className="text-xs text-zinc-400">
-                    <span className="text-zinc-500 font-mono text-[10px] uppercase">Why Insufficient:</span> {ws.whyInsufficient}
-                  </div>
-                  <div className="text-[11px] text-zinc-500">
-                    <span className="text-zinc-600 font-mono text-[10px] uppercase">Potential Value:</span> {ws.potentialValue}
+                  <h3 className="text-xs font-semibold text-white">{ws.title}</h3>
+                  <p className="text-xs text-zinc-300 italic font-mono">"{ws.userStatement}"</p>
+                  <div className="text-[11px] text-zinc-500 pt-1">
+                    <span className="font-medium text-zinc-400">Why Insufficient:</span> {ws.whyInsufficient}
                   </div>
                 </div>
               ))}
@@ -586,23 +613,23 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
       {activeTab === 'coverage' && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-sm font-semibold text-white tracking-tight">Research Coverage</h2>
+            <h2 className="text-sm font-semibold text-white tracking-tight">Research Coverage & Platform Telemetry</h2>
             <p className="text-xs text-zinc-400">
-              Connected endpoints, query distribution, and data pipeline integrity.
+              Active endpoints, platform health, and quality tier breakdown.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="glass-panel p-4 rounded-xl space-y-2.5">
+            <div className="border border-zinc-800 rounded-xl bg-zinc-950 p-4 space-y-2.5">
               <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-400">
                 Connected Platforms
               </h3>
               <div className="space-y-1.5">
                 {run.coverage.sourcesSucceeded.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs p-2 rounded-lg bg-black/60 border border-white/[0.05]">
+                  <div key={i} className="flex items-center justify-between text-xs p-2 rounded-lg bg-zinc-900 border border-zinc-850">
                     <span className="font-medium text-zinc-200 uppercase font-mono">{p}</span>
-                    <span className="text-zinc-400 font-mono text-[11px] flex items-center space-x-1">
-                      <Check className="w-3 h-3 text-zinc-400" />
+                    <span className="text-emerald-400 font-mono text-[11px] flex items-center space-x-1">
+                      <Check className="w-3 h-3 text-emerald-400" />
                       <span>Operational</span>
                     </span>
                   </div>
@@ -610,21 +637,21 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               </div>
             </div>
 
-            <div className="glass-panel p-4 rounded-xl space-y-2.5">
+            <div className="border border-zinc-800 rounded-xl bg-zinc-950 p-4 space-y-2.5">
               <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                Quality Tier Distribution
+                Quality Tier Breakdown
               </h3>
               <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between p-2 rounded-lg bg-black/60 border border-white/[0.05]">
-                  <span className="text-zinc-300">High Quality (First-Hand)</span>
+                <div className="flex justify-between p-2 rounded-lg bg-zinc-900 border border-zinc-850">
+                  <span className="text-zinc-300">High Quality (First-Hand Complaints)</span>
                   <span className="font-mono text-white font-medium">{run.coverage.qualityDistribution.high}</span>
                 </div>
-                <div className="flex justify-between p-2 rounded-lg bg-black/60 border border-white/[0.05]">
-                  <span className="text-zinc-400">Medium Quality (Discussion)</span>
+                <div className="flex justify-between p-2 rounded-lg bg-zinc-900 border border-zinc-850">
+                  <span className="text-zinc-400">Medium Quality (Community Discussions)</span>
                   <span className="font-mono text-white font-medium">{run.coverage.qualityDistribution.medium}</span>
                 </div>
-                <div className="flex justify-between p-2 rounded-lg bg-black/60 border border-white/[0.05]">
-                  <span className="text-zinc-500">Low Quality (Promotional/Filtered)</span>
+                <div className="flex justify-between p-2 rounded-lg bg-zinc-900 border border-zinc-850">
+                  <span className="text-zinc-500">Low Quality (Filtered / Promotional)</span>
                   <span className="font-mono text-white font-medium">{run.coverage.qualityDistribution.low}</span>
                 </div>
               </div>
@@ -633,27 +660,27 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
         </div>
       )}
 
-      {/* TAB 8: EXECUTIVE REPORT */}
+      {/* TAB 8: FULL MARKDOWN REPORT */}
       {activeTab === 'report' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-white tracking-tight">Executive Markdown Report</h2>
               <p className="text-xs text-zinc-400">
-                Structured research document ready for sharing or exporting.
+                Complete structured intelligence artifact containing research coverage, problem extractions, and opportunities.
               </p>
             </div>
             <div className="flex space-x-2">
               <button
                 onClick={handleCopyReport}
-                className="btn-secondary px-3 py-1.5 rounded-md text-xs font-medium flex items-center space-x-1"
+                className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 transition-colors flex items-center space-x-1"
               >
                 {copiedReport ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
                 <span>{copiedReport ? 'Copied' : 'Copy'}</span>
               </button>
               <button
                 onClick={handleDownloadReport}
-                className="btn-primary px-3 py-1.5 rounded-md text-xs flex items-center space-x-1"
+                className="px-3.5 py-1.5 rounded-md text-xs font-semibold bg-white text-black hover:bg-zinc-200 transition-colors flex items-center space-x-1"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Export .md</span>
@@ -661,7 +688,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             </div>
           </div>
 
-          <div className="glass-panel p-5 rounded-2xl font-mono text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-[70vh] overflow-y-auto">
+          <div className="border border-zinc-800 rounded-xl bg-zinc-950 p-6 font-mono text-xs text-zinc-200 whitespace-pre-wrap leading-relaxed max-h-[70vh] overflow-y-auto">
             {run.reportMarkdown}
           </div>
         </div>

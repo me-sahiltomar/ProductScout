@@ -389,6 +389,7 @@ export class Database {
             invalidationSignal: 'Contractors report their customers prefer email or that leads complain about receiving an automated text.',
           },
           evidenceConfidence: 88,
+          opportunityType: 'Automation',
           clusterId: 'clust_1',
           mvpProfile: {
             complexity: 'Low',

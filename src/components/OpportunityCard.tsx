@@ -6,7 +6,9 @@ import {
   Clock, 
   ArrowRight, 
   Quote, 
-  User
+  User,
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 import { ProductOpportunity } from '@/types';
 
@@ -21,18 +23,35 @@ export const OpportunityCard: React.FC<OpportunityCardProps> = ({
   onOpen,
   onToggleBookmark,
 }) => {
+  const evalData = opportunity.evaluation;
+
   return (
-    <div className="glass-card rounded-xl p-5 flex flex-col justify-between group cursor-pointer" onClick={() => onOpen(opportunity)}>
+    <div 
+      className="glass-card rounded-xl p-5 flex flex-col justify-between group cursor-pointer border border-zinc-800 hover:border-zinc-700 transition-all bg-zinc-950" 
+      onClick={() => onOpen(opportunity)}
+    >
       <div>
         {/* Top Badges */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="badge-mono text-[10px] font-mono px-2 py-0.5 rounded text-white font-medium">
-              {opportunity.evidenceConfidence}% Confidence
+            <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded bg-zinc-900 border border-zinc-750 text-zinc-200 font-medium">
+              {opportunity.opportunityType || 'SaaS'}
             </span>
 
-            <span className="badge-mono text-[10px] font-mono px-2 py-0.5 rounded text-zinc-400">
-              {opportunity.evidenceQuotes.length} Verified Signal(s)
+            {evalData && (
+              <span className={`font-mono text-[10px] uppercase px-2 py-0.5 rounded font-semibold ${
+                evalData.contextualFitScore >= 80 
+                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' 
+                  : evalData.contextualFitScore >= 60 
+                    ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                    : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+              }`}>
+                Fit: {evalData.contextualFitScore}/100
+              </span>
+            )}
+
+            <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
+              {opportunity.evidenceConfidence}% Confidence
             </span>
           </div>
 
@@ -45,7 +64,7 @@ export const OpportunityCard: React.FC<OpportunityCardProps> = ({
             className={`p-1.5 rounded-md border transition-all duration-150 ${
               opportunity.isSaved
                 ? 'bg-white text-black border-white shadow-sm'
-                : 'border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:text-white hover:border-white/20'
+                : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:border-zinc-700'
             }`}
             title={opportunity.isSaved ? 'Remove bookmark' : 'Bookmark opportunity'}
           >
@@ -54,7 +73,7 @@ export const OpportunityCard: React.FC<OpportunityCardProps> = ({
         </div>
 
         {/* Opportunity Name & Description */}
-        <h3 className="text-sm sm:text-base font-semibold text-white group-hover:text-zinc-100 transition-colors leading-snug">
+        <h3 className="text-sm sm:text-base font-semibold text-white group-hover:text-zinc-200 transition-colors leading-snug">
           {opportunity.name}
         </h3>
         <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
@@ -68,10 +87,17 @@ export const OpportunityCard: React.FC<OpportunityCardProps> = ({
         </div>
 
         {/* Problem Extract */}
-        <div className="mt-3 p-3 rounded-lg bg-[#050507]/90 border border-white/[0.06] space-y-1">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-medium block">
-            Evidence-Backed Problem
-          </span>
+        <div className="mt-3 p-3 rounded-lg bg-zinc-900/70 border border-zinc-800/80 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-medium block">
+              Evidence-Backed Problem
+            </span>
+            {evalData?.recommendedAction && (
+              <span className="text-[9px] font-mono uppercase text-zinc-400">
+                {evalData.recommendedAction}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-zinc-300 line-clamp-2 leading-relaxed">
             {opportunity.userProblem}
           </p>
@@ -89,7 +115,7 @@ export const OpportunityCard: React.FC<OpportunityCardProps> = ({
       </div>
 
       {/* Footer / MVP Metadata */}
-      <div className="mt-4 pt-3.5 border-t border-white/[0.06] flex items-center justify-between text-xs">
+      <div className="mt-4 pt-3.5 border-t border-zinc-800/80 flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2.5 text-zinc-500 font-mono text-[11px]">
           <span className="flex items-center space-x-1" title="Estimated MVP Build Time">
             <Clock className="w-3 h-3 text-zinc-500" />

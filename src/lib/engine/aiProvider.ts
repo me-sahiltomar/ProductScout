@@ -1,11 +1,11 @@
 import { 
   ClassifiedEvidence, 
   ExtractedProblem, 
-  ProblemCluster, 
   ProductOpportunity, 
   ResearchRunConfig,
   SystemSettings 
 } from '@/types';
+import { normalizeBrief } from './opportunityGenerator';
 
 export class AIProviderManager {
   private settings: SystemSettings;
@@ -56,21 +56,40 @@ export class AIProviderManager {
   ): Promise<{ problems: ExtractedProblem[]; opportunities: ProductOpportunity[] }> {
     const model = this.settings.geminiModel || 'gemini-1.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const brief = config.brief || normalizeBrief(config);
 
-    const prompt = `You are Cevon Opportunity Radar's Senior Product Analyst.
-Analyze these user problems and refine the product opportunities.
+    const prompt = `You are ProductScout's Senior Opportunity Intelligence Architect.
+Analyze these authentic practitioner signals and calibrate the product opportunities against the user's Research Brief.
+
 CRITICAL RULES:
-1. Ground everything strictly in the provided user evidence. Do not invent facts or market sizes.
-2. Clearly distinguish evidence from inference.
-3. Keep MVP narrow (1-2 weeks build).
+1. Ground everything strictly in the provided real-world practitioner evidence. Do not invent fake quotes or statistics.
+2. Clearly distinguish direct evidence from strategic inference.
+3. Calibrate MVP scope to the user's requested Build Horizon (${brief.opportunityProfile.buildHorizon}), Team Size (${brief.opportunityProfile.teamSize}), and Budget (${brief.opportunityProfile.budget}).
+${brief.opportunityProfile.buildHorizon === '7d' ? 'IMPORTANT: Keep scope strictly to a 7-day single workflow MVP with ruthless anti-scope.' : ''}
+${brief.constraints.exclusions.length > 0 ? `STRICT EXCLUSIONS (Do NOT suggest): ${brief.constraints.exclusions.join(', ')}` : ''}
 
-Topic: ${config.topic}
-Focus: ${config.focus}
+USER RESEARCH BRIEF:
+- Subject: ${brief.subject}
+- Objective: ${brief.objective}
+- Target User: ${brief.target.primaryUser || config.targetUser || 'Operators & Practitioners'}
+- Target Industry: ${brief.target.industry || 'Technology & Business Services'}
+- Build Horizon: ${brief.opportunityProfile.buildHorizon}
+- Target Product Types: ${brief.opportunityProfile.productTypes.join(', ')}
+- Priorities: ${brief.constraints.priorities.join(', ')}
+- Risk Tolerance: ${brief.constraints.riskProfile}
+
 Evidence Samples:
-${evidence.slice(0, 8).map(e => `- [${e.platform}] ${e.title}: "${e.snippet}"`).join('\n')}
+${evidence.slice(0, 8).map(e => `- [${e.platform}] ${e.title}: "${e.painQuote || e.snippet}"`).join('\n')}
 
 Existing Formulated Opportunities:
-${JSON.stringify(opportunities.map(o => ({ name: o.name, problem: o.userProblem, solution: o.proposedSolution, mvpScope: o.mvpScope })), null, 2)}
+${JSON.stringify(opportunities.map(o => ({ 
+  name: o.name, 
+  opportunityType: o.opportunityType,
+  problem: o.userProblem, 
+  solution: o.proposedSolution, 
+  mvpScope: o.mvpScope,
+  whatNotToBuildInitially: o.whatNotToBuildInitially
+})), null, 2)}
 
 Respond with refined JSON array of opportunities matching schema. If not possible, return [].`;
 
@@ -109,9 +128,11 @@ Respond with refined JSON array of opportunities matching schema. If not possibl
               ...opp,
               name: refined.name || opp.name,
               oneLineDescription: refined.oneLineDescription || opp.oneLineDescription,
+              opportunityType: refined.opportunityType || opp.opportunityType,
               proposedSolution: refined.proposedSolution || opp.proposedSolution,
               whyUseful: refined.whyUseful || opp.whyUseful,
               mvpScope: Array.isArray(refined.mvpScope) && refined.mvpScope.length > 0 ? refined.mvpScope : opp.mvpScope,
+              whatNotToBuildInitially: Array.isArray(refined.whatNotToBuildInitially) && refined.whatNotToBuildInitially.length > 0 ? refined.whatNotToBuildInitially : opp.whatNotToBuildInitially,
             };
           });
           return { problems, opportunities: mergedOpps };
@@ -126,17 +147,21 @@ Respond with refined JSON array of opportunities matching schema. If not possibl
 
   private async enrichWithOpenAI(
     config: ResearchRunConfig,
-    _evidence: ClassifiedEvidence[],
+    evidence: ClassifiedEvidence[],
     problems: ExtractedProblem[],
     opportunities: ProductOpportunity[],
     apiKey: string
   ): Promise<{ problems: ExtractedProblem[]; opportunities: ProductOpportunity[] }> {
     const baseUrl = this.settings.openaiBaseUrl || 'https://api.openai.com/v1';
     const model = this.settings.openaiModel || 'gpt-4o-mini';
-
     const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+    const brief = config.brief || normalizeBrief(config);
 
-    const prompt = `Refine these product opportunities based on real user evidence for topic: "${config.topic}". Return JSON array.`;
+    const prompt = `Refine and calibrate these product opportunities based on real user evidence and the research brief.
+Subject: "${brief.subject}".
+Build Horizon: "${brief.opportunityProfile.buildHorizon}".
+Target: "${brief.target.primaryUser || config.targetUser || 'Operators'}".
+Return JSON array with refined fields: name, oneLineDescription, opportunityType, proposedSolution, whyUseful, mvpScope, whatNotToBuildInitially.`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
@@ -150,7 +175,7 @@ Respond with refined JSON array of opportunities matching schema. If not possibl
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: 'You are Cevon Opportunity Radar. Always output valid JSON.' },
+          { role: 'system', content: 'You are ProductScout Opportunity Intelligence. Always output valid JSON array.' },
           { role: 'user', content: prompt }
         ],
         response_format: { type: 'json_object' },
