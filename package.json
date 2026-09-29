@@ -8,9 +8,11 @@
     "start": "next start -p 3002",
     "lint": "next lint",
     "test": "npx tsx test/v2_architecture_matrix.ts && npx tsx test/gemini_discovery_test.ts",
-    "test:e2e": "node test/e2e_security_verification.mjs"
+    "test:e2e": "node test/e2e_security_verification.mjs",
+    "test:auth": "node test/auth_productscout_verification.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.474.0",

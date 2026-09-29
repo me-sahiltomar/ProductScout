@@ -7,6 +7,7 @@ import {
   ArrowRight, 
   Radio
 } from 'lucide-react';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { RunSummary } from '@/lib/api/client';
 
 interface HistoryViewProps {
@@ -22,6 +23,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   onDeleteRun,
   onStartNew,
 }) => {
+  const { firstName, isAuthenticated } = useAuth();
   const [search, setSearch] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -46,7 +48,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
-            Research History
+            {isAuthenticated ? `${firstName}'s Research History` : 'Research History'}
           </h1>
           <p className="text-xs text-zinc-400 mt-0.5">
             Access previous research scans, extracted user evidence, and opportunity blueprints.

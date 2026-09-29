@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { 
   ArrowRight, 
   Layers, 
@@ -27,6 +29,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onStartNew,
   onOpenRun,
 }) => {
+  const { displayName, firstName, isAuthenticated } = useAuth();
   const totalProblems = runs.reduce((acc, r) => acc + (r.problemsCount || 0), 0);
   const totalSources = runs.reduce((acc, r) => acc + (r.sourcesCount || 0), 0);
 
@@ -72,9 +75,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Hero Section with Glass Specular Depth */}
       <div className="relative overflow-hidden rounded-2xl glass-panel p-6 sm:p-8 md:p-10">
         <div className="relative z-10 max-w-3xl">
-          <div className="badge-mono inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono text-zinc-300 mb-4">
-            <Radio className="w-3 h-3 text-zinc-400" />
-            <span>Problem-First Product Intelligence</span>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="badge-mono inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono text-zinc-300">
+              <Radio className="w-3 h-3 text-zinc-400" />
+              <span>Problem-First Product Intelligence</span>
+            </div>
+
+            {isAuthenticated ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-zinc-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span>Hello, <strong className="text-white font-semibold">{firstName}</strong></span>
+              </div>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-zinc-400 hover:text-white bg-white/[0.02] border border-white/[0.06] hover:border-white/20 transition-colors"
+              >
+                <span>Sign in to sync your scans</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
           </div>
 
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.15]">

@@ -17,6 +17,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { ProductOpportunity } from '@/types';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 interface OpportunityDetailModalProps {
   opportunity: ProductOpportunity;
@@ -31,6 +32,7 @@ export const OpportunityDetailModal: React.FC<OpportunityDetailModalProps> = ({
   onToggleBookmark,
   onSaveNotes,
 }) => {
+  const { firstName, isAuthenticated } = useAuth();
   const [copied, setCopied] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
   const [notes, setNotes] = useState(opportunity.notes || '');
@@ -434,7 +436,7 @@ Validation Experiment:
           <div className="space-y-2.5 pt-5 border-t border-zinc-800">
             <div className="flex items-center justify-between">
               <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 font-medium">
-                Founder Notes & Progress
+                {isAuthenticated ? `${firstName}'s Founder Notes & Progress` : 'Founder Notes & Progress'}
               </label>
               {notesSaved && (
                 <span className="text-xs text-emerald-400 font-medium flex items-center space-x-1">
