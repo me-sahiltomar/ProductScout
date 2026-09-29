@@ -10,7 +10,7 @@ interface DatabaseSchema {
 
 const DEFAULT_SETTINGS: SystemSettings = {
   aiProvider: 'heuristic',
-  geminiModel: 'gemini-1.5-flash',
+  geminiModel: 'gemini-3.8-flash',
   openaiBaseUrl: 'https://api.openai.com/v1',
   openaiModel: 'gpt-4o-mini',
   defaultMaxSources: 30,

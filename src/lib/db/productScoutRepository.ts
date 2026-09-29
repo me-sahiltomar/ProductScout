@@ -1011,7 +1011,7 @@ export class ProductScoutRepository {
 
       return {
         aiProvider: (data.ai_provider as any) || 'heuristic',
-        geminiModel: data.gemini_model || 'gemini-1.5-flash',
+        geminiModel: data.gemini_model || 'gemini-3.8-flash',
         openaiBaseUrl: data.openai_base_url || 'https://api.openai.com/v1',
         openaiModel: data.openai_model || 'gpt-4o-mini',
         defaultMaxSources: data.default_max_sources || 30,

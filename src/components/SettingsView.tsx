@@ -15,12 +15,22 @@ interface SettingsViewProps {
   onSaveSettings: (settings: Partial<SystemSettings>) => Promise<void>;
 }
 
+export const GEMINI_MODELS = [
+  { id: 'gemini-3.8-flash', label: 'gemini-3.8-flash (Recommended • Agentic Workhorse & Coding)' },
+  { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash (Fast Multimodal Reasoning)' },
+  { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro (Complex Frontier Reasoning)' },
+  { id: 'gemini-2.0-flash', label: 'gemini-2.0-flash (Next-Gen Fast)' },
+  { id: 'gemini-1.5-flash', label: 'gemini-1.5-flash (Legacy Fast)' },
+  { id: 'gemini-1.5-pro', label: 'gemini-1.5-pro (Legacy Pro)' },
+];
+
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   onSaveSettings,
 }) => {
   const [provider, setProvider] = useState<'heuristic' | 'gemini' | 'openai'>(settings.aiProvider || 'heuristic');
-  const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-1.5-flash');
+  const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3.8-flash');
+  const [isCustomGemini, setIsCustomGemini] = useState(false);
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState(settings.openaiBaseUrl || 'https://api.openai.com/v1');
   const [openaiModel, setOpenaiModel] = useState(settings.openaiModel || 'gpt-4o-mini');
   const [defaultMaxSources, setDefaultMaxSources] = useState(settings.defaultMaxSources || 30);
@@ -31,7 +41,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   useEffect(() => {
     setProvider(settings.aiProvider || 'heuristic');
-    setGeminiModel(settings.geminiModel || 'gemini-1.5-flash');
+    const model = settings.geminiModel || 'gemini-3.8-flash';
+    setGeminiModel(model);
+    setIsCustomGemini(!GEMINI_MODELS.some(m => m.id === model));
     setOpenaiBaseUrl(settings.openaiBaseUrl || 'https://api.openai.com/v1');
     setOpenaiModel(settings.openaiModel || 'gpt-4o-mini');
     setDefaultMaxSources(settings.defaultMaxSources || 30);
@@ -110,7 +122,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 {provider === 'gemini' && <Check className="w-3.5 h-3.5 text-black" />}
               </div>
               <p className={`text-[11px] leading-normal ${provider === 'gemini' ? 'text-zinc-700' : 'text-zinc-500'}`}>
-                Gemini 1.5 Flash / 2.0 Flash for structured deep problem refinement.
+                Gemini 3.8 Flash (Recommended) or 2.5 / 2.0 for structured deep problem refinement.
               </p>
             </div>
 
@@ -135,18 +147,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {provider === 'gemini' && (
             <div className="p-4 rounded-xl bg-black/60 border border-white/[0.07] space-y-3">
               <div>
-                <label className="block text-xs text-zinc-300 mb-1">
-                  Gemini Model
-                </label>
-                <select
-                  value={geminiModel}
-                  onChange={(e) => setGeminiModel(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-black/80 border border-white/[0.08] text-xs text-zinc-200 focus:outline-none focus:border-white/30"
-                >
-                  <option value="gemini-1.5-flash">gemini-1.5-flash (Fast & Economical)</option>
-                  <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning)</option>
-                  <option value="gemini-2.0-flash">gemini-2.0-flash (Latest)</option>
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs text-zinc-300">
+                    Gemini Model
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isCustomGemini) {
+                        setIsCustomGemini(true);
+                      } else {
+                        setIsCustomGemini(false);
+                        setGeminiModel('gemini-3.8-flash');
+                      }
+                    }}
+                    className="text-[11px] text-zinc-400 hover:text-white transition-colors"
+                  >
+                    {isCustomGemini ? 'Switch to preset models' : 'Custom model ID'}
+                  </button>
+                </div>
+
+                {!isCustomGemini ? (
+                  <select
+                    value={geminiModel}
+                    onChange={(e) => {
+                      if (e.target.value === 'custom') {
+                        setIsCustomGemini(true);
+                      } else {
+                        setGeminiModel(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-lg bg-black/80 border border-white/[0.08] text-xs text-zinc-200 focus:outline-none focus:border-white/30"
+                  >
+                    {GEMINI_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                    <option value="custom">Custom model identifier...</option>
+                  </select>
+                ) : (
+                  <div className="space-y-1.5">
+                    <input
+                      type="text"
+                      value={geminiModel}
+                      onChange={(e) => setGeminiModel(e.target.value)}
+                      placeholder="e.g. gemini-3.8-flash"
+                      className="w-full px-3 py-2 rounded-lg bg-black/80 border border-white/[0.08] text-xs text-zinc-200 focus:outline-none focus:border-white/30 font-mono"
+                    />
+                    <p className="text-[11px] text-zinc-500">
+                      Specify any Gemini model name available on your API key (e.g. <code className="text-zinc-400 font-mono">gemini-3.8-flash</code>).
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs">

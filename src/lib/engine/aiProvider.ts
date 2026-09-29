@@ -54,7 +54,7 @@ export class AIProviderManager {
     opportunities: ProductOpportunity[],
     apiKey: string
   ): Promise<{ problems: ExtractedProblem[]; opportunities: ProductOpportunity[] }> {
-    const model = this.settings.geminiModel || 'gemini-1.5-flash';
+    const model = this.settings.geminiModel || 'gemini-3.8-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const brief = config.brief || normalizeBrief(config);
 
