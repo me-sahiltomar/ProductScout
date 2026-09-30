@@ -9,7 +9,9 @@ import {
   Bookmark, 
   Check, 
   Compass, 
+  KeyRound,
   Loader2, 
+  Lock,
   LogOut, 
   Radio, 
   ShieldCheck, 
@@ -19,14 +21,22 @@ import { api } from '@/lib/api/client';
 
 export default function AccountPage() {
   const router = useRouter();
-  const { user, profile, isAuthenticated, isLoading, signOut, updateProfile, displayName, firstName } = useAuth();
+  const { user, profile, isAuthenticated, isLoading, signOut, updateProfile, updatePassword, displayName, firstName } = useAuth();
 
   const [inputName, setInputName] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
   const [savedCount, setSavedCount] = useState<number>(0);
   const [runsCount, setRunsCount] = useState<number>(0);
+
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -89,10 +99,47 @@ export default function AccountPage() {
     }
   };
 
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || !confirmPassword) {
+      setPasswordError('Please fill in both password fields.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+
+    setSavingPassword(true);
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    try {
+      const { error } = await updatePassword(newPassword);
+      if (error) {
+        setPasswordError(error.message);
+      } else {
+        setPasswordSuccess(true);
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => setPasswordSuccess(false), 3000);
+      }
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to update password.');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     router.push('/');
   };
+
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 animate-fade-in text-zinc-300">
@@ -268,7 +315,79 @@ export default function AccountPage() {
             </form>
           </div>
 
+          {/* Security & Password Card */}
+          <div className="rounded-xl border border-white/[0.08] bg-zinc-950/70 p-6 shadow-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <KeyRound className="w-4 h-4 text-zinc-300" />
+              <h3 className="text-sm font-semibold text-white">
+                Security & Password
+              </h3>
+            </div>
+            <p className="text-xs text-zinc-400 mb-5">
+              Update your account password. If you signed in via Google OAuth, setting a password allows direct email/password login as well.
+            </p>
+
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              {passwordError && (
+                <div className="p-3 rounded-lg bg-red-950/40 border border-red-800/60 text-xs text-red-300">
+                  {passwordError}
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className="flex items-center gap-1.5 p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-300">
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>Password updated successfully.</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  New password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="w-full max-w-sm px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                  Confirm new password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="w-full max-w-sm px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={savingPassword}
+                  className="btn-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-60"
+                >
+                  {savingPassword ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Update password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
           {/* Quick Launch Cards */}
+
           <div className="rounded-xl border border-white/[0.08] bg-zinc-950/70 p-6 shadow-xl">
             <h3 className="text-sm font-semibold text-white mb-1">
               Your Product Discovery Workspace

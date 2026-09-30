@@ -14,7 +14,10 @@ export async function GET(request: Request) {
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
-  const safeNext = getSafeRedirectPath(rawNext, '/');
+  const cookieHeader = request.headers.get('cookie') || '';
+  const match = cookieHeader.match(/cx_post_auth_dest=([^;]+)/);
+  const cookieDest = match ? decodeURIComponent(match[1]) : null;
+  const safeNext = getSafeRedirectPath(rawNext || cookieDest, '/');
 
   // Derive guaranteed ProductScout base origin
   const requestUrl = new URL(request.url);
@@ -30,7 +33,9 @@ export async function GET(request: Request) {
     console.error('ProductScout auth callback provider error:', error, errorDescription);
     const redirectUrl = new URL('/auth/login', baseOrigin);
     redirectUrl.searchParams.set('error', errorDescription || error);
-    return NextResponse.redirect(redirectUrl);
+    const response = NextResponse.redirect(redirectUrl);
+    response.cookies.delete('cx_post_auth_dest');
+    return response;
   }
 
   if (code) {
@@ -42,17 +47,25 @@ export async function GET(request: Request) {
         console.error('ProductScout session exchange error:', exchangeError.message);
         const redirectUrl = new URL('/auth/login', baseOrigin);
         redirectUrl.searchParams.set('error', exchangeError.message);
-        return NextResponse.redirect(redirectUrl);
+        const response = NextResponse.redirect(redirectUrl);
+        response.cookies.delete('cx_post_auth_dest');
+        return response;
       }
 
-      return NextResponse.redirect(new URL(safeNext, baseOrigin));
+      const response = NextResponse.redirect(new URL(safeNext, baseOrigin));
+      response.cookies.delete('cx_post_auth_dest');
+      return response;
     } catch (err: any) {
       console.error('ProductScout unexpected callback error:', err);
       const redirectUrl = new URL('/auth/login', baseOrigin);
       redirectUrl.searchParams.set('error', 'Authentication failed. Please try again.');
-      return NextResponse.redirect(redirectUrl);
+      const response = NextResponse.redirect(redirectUrl);
+      response.cookies.delete('cx_post_auth_dest');
+      return response;
     }
   }
 
-  return NextResponse.redirect(new URL('/auth/login', baseOrigin));
+  const response = NextResponse.redirect(new URL('/auth/login', baseOrigin));
+  response.cookies.delete('cx_post_auth_dest');
+  return response;
 }

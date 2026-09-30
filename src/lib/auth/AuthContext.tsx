@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { createClient } from './client';
-import { getProductCallbackUrl, getProductResetPasswordUrl, isSupabaseAuthConfigured } from './config';
+import { getProductCallbackUrl, getProductResetPasswordUrl, isSupabaseAuthConfigured, setPostAuthDestination } from './config';
 import type { AuthContextValue, UserProfile } from './types';
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -16,32 +16,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const supabase = useMemo(() => createClient(), []);
 
-  // Fetch or build the profile for the given user
+  // Fetch or build the profile for the given user, self-healing via upsert if absent
   const fetchProfile = async (currentUser: User): Promise<UserProfile | null> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
-        // Fallback to auth metadata if profile query fails
-        const fallbackName =
-          currentUser.user_metadata?.full_name ||
-          currentUser.user_metadata?.name ||
-          currentUser.email?.split('@')[0] ||
-          'Explorer';
-        return {
-          id: currentUser.id,
-          display_name: fallbackName,
-          avatar_url: currentUser.user_metadata?.avatar_url || null,
-        };
+      if (data) {
+        return data as UserProfile;
       }
 
-      return data as UserProfile;
+      // If missing from public.profiles, self-heal by upserting
+      const fallbackName =
+        currentUser.user_metadata?.full_name ||
+        currentUser.user_metadata?.name ||
+        currentUser.email?.split('@')[0] ||
+        'Explorer';
+
+      const initialProfile = {
+        id: currentUser.id,
+        display_name: fallbackName,
+        avatar_url: currentUser.user_metadata?.avatar_url || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: upserted } = await supabase
+        .from('profiles')
+        .upsert(initialProfile)
+        .select('*')
+        .maybeSingle();
+
+      if (upserted) {
+        return upserted as UserProfile;
+      }
+
+      return {
+        id: currentUser.id,
+        display_name: fallbackName,
+        avatar_url: currentUser.user_metadata?.avatar_url || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
     } catch (err) {
-      console.warn('Error fetching profile from public.profiles:', err);
+      console.warn('Error fetching/upserting profile from public.profiles:', err);
       return {
         id: currentUser.id,
         display_name: currentUser.email?.split('@')[0] || 'Explorer',
@@ -49,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
   };
+
 
   useEffect(() => {
     let mounted = true;
@@ -114,8 +135,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Google OAuth sign-in with ProductScout callback
-  const signInWithGoogle = async (_redirectTo?: string) => {
+  const signInWithGoogle = async (redirectTo?: string) => {
     try {
+      if (redirectTo) {
+        setPostAuthDestination(redirectTo);
+      }
       const callbackUrl = getProductCallbackUrl();
 
       const { error } = await supabase.auth.signInWithOAuth({
@@ -134,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: err };
     }
   };
+
 
   // Email & Password sign-in
   const signInWithEmail = async (email: string, password: string) => {
@@ -237,13 +262,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: user.id,
           ...updates,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+        });
 
       if (error) return { error };
+
+      // Synchronize display name into auth user_metadata
+      if (updates.display_name) {
+        await supabase.auth.updateUser({
+          data: {
+            full_name: updates.display_name.trim(),
+            name: updates.display_name.trim(),
+          },
+        });
+      }
 
       await refreshProfile();
       return { error: null };
@@ -251,6 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: err };
     }
   };
+
 
   // Helper names
   const effectiveDisplayName =

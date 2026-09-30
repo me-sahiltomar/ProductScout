@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { getSafeRedirectPath } from '@/lib/auth/config';
-import { AlertCircle, ArrowRight, Loader2, Radio, ShieldCheck } from 'lucide-react';
+import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Radio, ShieldCheck } from 'lucide-react';
 
 interface LoginFormProps {
   initialRedirect?: string;
@@ -20,9 +20,11 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState(initialError || '');
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
+
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -165,16 +167,26 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
               <label className="block text-xs font-medium text-zinc-300" htmlFor="password">
                 Password
               </label>
-              <Link
-                href="/auth/forgot-password"
-                className="text-[11px] text-zinc-400 hover:text-white transition-colors"
-              >
-                Forgot password?
-              </Link>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[11px] text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{showPassword ? 'Hide' : 'Show'}</span>
+                </button>
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-[11px] text-zinc-400 hover:text-white transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
             <input
               id="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
               autoComplete="current-password"
               value={password}
@@ -183,6 +195,7 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
               className="w-full px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
             />
           </div>
+
 
           <button
             type="submit"

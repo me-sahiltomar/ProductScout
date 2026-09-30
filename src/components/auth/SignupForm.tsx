@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { getSafeRedirectPath } from '@/lib/auth/config';
-import { AlertCircle, ArrowRight, CheckCircle2, Loader2, Radio, ShieldCheck } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Radio, ShieldCheck } from 'lucide-react';
 
 interface SignupFormProps {
   initialRedirect?: string;
@@ -20,6 +20,8 @@ export function SignupForm({ initialRedirect }: SignupFormProps) {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successConfirmation, setSuccessConfirmation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -33,8 +35,8 @@ export function SignupForm({ initialRedirect }: SignupFormProps) {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setErrorMsg('Please enter both your email address and password.');
+    if (!email || !password || !confirmPassword) {
+      setErrorMsg('Please fill in all required fields.');
       return;
     }
 
@@ -43,17 +45,23 @@ export function SignupForm({ initialRedirect }: SignupFormProps) {
       return;
     }
 
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match.');
+      return;
+    }
+
     setErrorMsg('');
     setSubmitting(true);
 
     try {
       const { error, needsEmailConfirmation } = await signUpWithEmail(
-        email,
+        email.trim(),
         password,
-        displayName
+        displayName.trim() || undefined
       );
 
       if (error) {
+
         setErrorMsg(error.message);
         setSubmitting(false);
         return;
@@ -217,12 +225,22 @@ export function SignupForm({ initialRedirect }: SignupFormProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5" htmlFor="password">
-              Password <span className="text-zinc-500 font-normal">(min 6 characters)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-medium text-zinc-300" htmlFor="password">
+                Password <span className="text-zinc-500 font-normal">(min 6 characters)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-[11px] text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                <span>{showPassword ? 'Hide' : 'Show'}</span>
+              </button>
+            </div>
             <input
               id="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
               autoComplete="new-password"
               value={password}
@@ -231,6 +249,23 @@ export function SignupForm({ initialRedirect }: SignupFormProps) {
               className="w-full px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
             />
           </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1.5" htmlFor="confirmPassword">
+              Confirm password
+            </label>
+            <input
+              id="confirmPassword"
+              type={showPassword ? 'text' : 'password'}
+              required
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
+            />
+          </div>
+
 
           <button
             type="submit"
