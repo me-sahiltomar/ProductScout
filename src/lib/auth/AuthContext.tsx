@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { createClient } from './client';
-import { getProductCallbackUrl, isSupabaseAuthConfigured } from './config';
+import { getProductCallbackUrl, getProductResetPasswordUrl, isSupabaseAuthConfigured } from './config';
 import type { AuthContextValue, UserProfile } from './types';
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -114,13 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Google OAuth sign-in with ProductScout callback
-  const signInWithGoogle = async (redirectTo?: string) => {
+  const signInWithGoogle = async (_redirectTo?: string) => {
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
-      const callbackBase = getProductCallbackUrl(origin);
-      const callbackUrl = redirectTo
-        ? `${callbackBase}?next=${encodeURIComponent(redirectTo)}`
-        : callbackBase;
+      const callbackUrl = getProductCallbackUrl();
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -164,8 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Email & Password sign-up
   const signUpWithEmail = async (email: string, password: string, displayName?: string) => {
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
-      const emailRedirectTo = getProductCallbackUrl(origin);
+      const emailRedirectTo = getProductCallbackUrl();
 
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
@@ -197,8 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Password Reset Email Request
   const resetPasswordForEmail = async (email: string) => {
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
-      const redirectTo = `${origin || 'https://productscout.cevonx.com'}/auth/reset-password`;
+      const redirectTo = getProductResetPasswordUrl();
 
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo,

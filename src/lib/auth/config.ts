@@ -1,15 +1,76 @@
+/**
+ * ProductScout (A CevonX Product) — Authentication Configuration
+ * 
+ * Central Supabase Auth architecture with product-specific callback resolution.
+ * Dedicated destination: https://productscout.cevonx.com
+ */
+
+export const PRODUCT_ID = 'productscout';
+export const PRODUCT_NAME = 'ProductScout';
 export const DEFAULT_SUPABASE_URL = 'https://gzhiltwyuhclzbhaypzd.supabase.co';
-export const DEFAULT_SITE_URL = 'https://productscout.cevonx.com';
+export const DEFAULT_APP_BASE_URL = 'https://productscout.cevonx.com';
+
+/**
+ * Checks if Supabase credentials are configured in the environment.
+ */
+export function isSupabaseAuthConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_KEY ||
+    '';
+  return Boolean(url && key);
+}
+
+/**
+ * Resolves the application base URL for ProductScout.
+ * Priority:
+ * 1. Client window.location.origin (if in browser)
+ * 2. Explicit origin parameter (if valid http/https URL)
+ * 3. Environment variables (NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL, strictly rejecting foreign domains like products.cevonx.com)
+ * 4. Production canonical default: https://productscout.cevonx.com
+ */
+export function getAppBaseUrl(origin?: string): string {
+  // If running in browser, prioritize current window origin so we always match the host
+  if (typeof window !== 'undefined' && window.location?.origin && window.location.origin.startsWith('http')) {
+    return window.location.origin.replace(/\/$/, '');
+  }
+
+  // If origin explicitly passed
+  if (origin && typeof origin === 'string' && origin.startsWith('http')) {
+    return origin.replace(/\/$/, '');
+  }
+
+  // Environment variable override (safeguard: ignore if pointing to another CevonX product)
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl && envUrl.startsWith('http') && !envUrl.includes('products.cevonx.com')) {
+    return envUrl.replace(/\/$/, '');
+  }
+
+  return DEFAULT_APP_BASE_URL;
+}
 
 /**
  * Resolves the OAuth and auth verification callback URL for ProductScout.
+ * Production destination: https://productscout.cevonx.com/auth/callback
  */
 export function getProductCallbackUrl(origin?: string): string {
-  if (origin && typeof origin === 'string' && origin.startsWith('http')) {
-    return `${origin.replace(/\/$/, '')}/auth/callback`;
+  if (
+    process.env.NEXT_PUBLIC_PRODUCT_CALLBACK_URL &&
+    !process.env.NEXT_PUBLIC_PRODUCT_CALLBACK_URL.includes('products.cevonx.com')
+  ) {
+    return process.env.NEXT_PUBLIC_PRODUCT_CALLBACK_URL;
   }
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;
-  return `${siteUrl.replace(/\/$/, '')}/auth/callback`;
+  return `${getAppBaseUrl(origin)}/auth/callback`;
+}
+
+/**
+ * Resolves the password reset destination URL for ProductScout.
+ * Production destination: https://productscout.cevonx.com/auth/reset-password
+ */
+export function getProductResetPasswordUrl(origin?: string): string {
+  return `${getAppBaseUrl(origin)}/auth/reset-password`;
 }
 
 /**
@@ -34,17 +95,4 @@ export function getSafeRedirectPath(
   if (trimmed.includes('\\')) return fallback;
 
   return trimmed;
-}
-
-/**
- * Checks if Supabase credentials are configured in the environment.
- */
-export function isSupabaseAuthConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_KEY ||
-    '';
-  return Boolean(url && key);
 }
