@@ -426,13 +426,18 @@ export class ProductScoutRepository {
       return;
     }
 
+    const isValidUuid = scope?.userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope.userId);
+    const sanitizedUserId = isValidUuid ? scope.userId : null;
+    const isOrgUuid = scope?.organizationId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope.organizationId);
+    const sanitizedOrgId = isOrgUuid ? scope.organizationId : null;
+
     try {
       // 1. Persist Run Header
       const { error: runErr } = await client.from('productscout_research_runs').upsert({
         id: run.id,
         product_id: 'productscout',
-        user_id: scope?.userId || null,
-        organization_id: scope?.organizationId || null,
+        user_id: sanitizedUserId,
+        organization_id: sanitizedOrgId,
         is_reference: (run as any).isReference || false,
         topic: run.config.topic,
         timeframe: run.config.timeframe,
@@ -691,8 +696,8 @@ export class ProductScoutRepository {
       // Mirror into local cache for instantaneous UX continuity
       this.localDb.saveRun(run);
     } catch (err: any) {
-      console.error('Error persisting run to Supabase:', err);
-      throw err;
+      console.warn('[ProductScout] Supabase persistence error, falling back to local storage:', err.message);
+      this.localDb.saveRun(run);
     }
   }
 

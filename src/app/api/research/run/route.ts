@@ -86,8 +86,8 @@ export async function POST(req: NextRequest) {
     const pipeline = new ResearchPipeline(repo);
 
     const scope = {
-      userId: auth.userId || guestId,
-      organizationId: auth.organizationId,
+      userId: auth.userId || null,
+      organizationId: auth.organizationId || null,
     };
 
     const run = await pipeline.execute(config, scope);
