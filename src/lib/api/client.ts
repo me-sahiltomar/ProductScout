@@ -1,6 +1,31 @@
 import { ProductOpportunity, ResearchRun, ResearchRunConfig, SystemSettings } from '@/types';
+import { createClient } from '@/lib/auth/client';
 
 const BASE_URL = '/api';
+
+/**
+ * Returns request headers with the active Supabase JWT session token attached if logged in.
+ */
+async function getAuthHeaders(contentType: boolean = true): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  if (contentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  try {
+    if (typeof window !== 'undefined') {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.access_token) {
+        headers['Authorization'] = `Bearer ${data.session.access_token}`;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not extract session access token:', err);
+  }
+
+  return headers;
+}
 
 export interface RunSummary {
   id: string;
@@ -17,9 +42,10 @@ export interface RunSummary {
 
 export const api = {
   async runResearch(config: ResearchRunConfig): Promise<ResearchRun> {
+    const headers = await getAuthHeaders(true);
     const res = await fetch(`${BASE_URL}/research/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(config),
     });
     if (!res.ok) {
@@ -33,7 +59,8 @@ export const api = {
 
   async getRuns(): Promise<RunSummary[]> {
     try {
-      const res = await fetch(`${BASE_URL}/research/runs`);
+      const headers = await getAuthHeaders(false);
+      const res = await fetch(`${BASE_URL}/research/runs`, { headers });
       if (res.ok) {
         const runs: RunSummary[] = await res.json();
         return runs;
@@ -46,7 +73,8 @@ export const api = {
 
   async getRun(id: string): Promise<ResearchRun> {
     try {
-      const res = await fetch(`${BASE_URL}/research/runs/${id}`);
+      const headers = await getAuthHeaders(false);
+      const res = await fetch(`${BASE_URL}/research/runs/${id}`, { headers });
       if (res.ok) {
         const run: ResearchRun = await res.json();
         this.cacheRunLocally(run);
@@ -63,7 +91,8 @@ export const api = {
 
   async deleteRun(id: string): Promise<void> {
     try {
-      await fetch(`${BASE_URL}/research/runs/${id}`, { method: 'DELETE' });
+      const headers = await getAuthHeaders(false);
+      await fetch(`${BASE_URL}/research/runs/${id}`, { method: 'DELETE', headers });
     } catch (e) {
       console.warn('Delete run API error:', e);
     }
@@ -72,7 +101,8 @@ export const api = {
 
   async getSavedOpportunities(): Promise<ProductOpportunity[]> {
     try {
-      const res = await fetch(`${BASE_URL}/opportunities/saved`);
+      const headers = await getAuthHeaders(false);
+      const res = await fetch(`${BASE_URL}/opportunities/saved`, { headers });
       if (res.ok) {
         const data: ProductOpportunity[] = await res.json();
         if (typeof window !== 'undefined') {
@@ -90,9 +120,10 @@ export const api = {
 
   async toggleBookmark(opportunityId: string, runId?: string): Promise<{ isSaved: boolean }> {
     try {
+      const headers = await getAuthHeaders(true);
       const res = await fetch(`${BASE_URL}/opportunities/${opportunityId}/bookmark`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ runId }),
       });
       if (res.ok) return res.json();
@@ -104,9 +135,10 @@ export const api = {
 
   async saveNotes(opportunityId: string, notes: string): Promise<void> {
     try {
+      const headers = await getAuthHeaders(true);
       await fetch(`${BASE_URL}/opportunities/${opportunityId}/notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ notes }),
       });
     } catch (e) {
@@ -116,7 +148,8 @@ export const api = {
 
   async getSettings(): Promise<SystemSettings> {
     try {
-      const res = await fetch(`${BASE_URL}/settings`);
+      const headers = await getAuthHeaders(false);
+      const res = await fetch(`${BASE_URL}/settings`, { headers });
       if (res.ok) return res.json();
     } catch (e) {
       console.warn('Get settings API error:', e);
@@ -129,9 +162,10 @@ export const api = {
   },
 
   async updateSettings(settings: Partial<SystemSettings>): Promise<{ success: boolean; settings: SystemSettings }> {
+    const headers = await getAuthHeaders(true);
     const res = await fetch(`${BASE_URL}/settings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(settings),
     });
     if (!res.ok) throw new Error('Failed to update settings');

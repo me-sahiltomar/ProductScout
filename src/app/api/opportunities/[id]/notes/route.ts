@@ -12,8 +12,8 @@ export async function POST(
     const auth = await getAuthContext(req);
     if (!auth.isAuthenticated) {
       return NextResponse.json(
-        { error: 'Authentication required to update opportunity notes.' },
-        { status: 401 }
+        { success: false, requiresAuth: true, error: 'Sign in to update opportunity notes.' },
+        { status: 200 }
       );
     }
 

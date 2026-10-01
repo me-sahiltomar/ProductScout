@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
-import { createClient, User } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient, User } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
 import { SUPABASE_URL, SUPABASE_KEY } from '@/lib/db/supabaseClient';
+import { DEFAULT_SUPABASE_URL } from './config';
 
 export interface AuthContext {
   user: User | null;
@@ -13,13 +15,21 @@ export interface AuthContext {
  * Extracts and verifies the Supabase user from the request.
  * Checks:
  * 1. Authorization: Bearer <token>
- * 2. Cookie: sb-access-token or sb-<project>-auth-token
+ * 2. @supabase/ssr chunked cookies via request
+ * 3. Fallback raw cookie inspection
  *
  * If valid, fetches or provisions their default organization context.
  */
 export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
-  // If Supabase is not configured, return unauthenticated context
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_KEY ||
+    SUPABASE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
     return {
       user: null,
       userId: null,
@@ -29,47 +39,90 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
   }
 
   try {
-    let token: string | null = null;
+    let user: User | null = null;
 
-    // 1. Check Authorization header
+    // 1. Check Authorization header: Bearer <token>
     const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
     if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
-      token = authHeader.substring(7).trim();
+      const token = authHeader.substring(7).trim();
+      if (token) {
+        try {
+          const adminClient = createSupabaseClient(url, key, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          const { data, error } = await adminClient.auth.getUser(token);
+          if (!error && data?.user) {
+            user = data.user;
+          }
+        } catch (e) {
+          console.warn('Bearer token verification failed:', e);
+        }
+      }
     }
 
-    // 2. Check cookies if header absent
-    if (!token) {
+    // 2. If no user yet, check cookies via @supabase/ssr
+    if (!user) {
+      try {
+        const ssrClient = createServerClient(url, key, {
+          cookies: {
+            getAll() {
+              return req.cookies.getAll();
+            },
+            setAll() {},
+          },
+        });
+        const { data, error } = await ssrClient.auth.getUser();
+        if (!error && data?.user) {
+          user = data.user;
+        }
+      } catch (e) {
+        console.warn('SSR cookies verification failed:', e);
+      }
+    }
+
+    // 3. Fallback: Check raw cookie header if needed
+    if (!user) {
       const cookieHeader = req.headers.get('cookie') || '';
-      const cookies = Object.fromEntries(
-        cookieHeader.split(';').map(c => {
-          const [k, ...v] = c.trim().split('=');
-          return [k, decodeURIComponent(v.join('='))];
-        })
-      );
+      if (cookieHeader) {
+        const cookies = Object.fromEntries(
+          cookieHeader.split(';').map(c => {
+            const [k, ...v] = c.trim().split('=');
+            return [k, decodeURIComponent(v.join('='))];
+          })
+        );
 
-      token = cookies['sb-access-token'] || null;
-
-      // Also inspect Supabase Auth v2 chunked cookie structure
-      if (!token) {
-        for (const [k, v] of Object.entries(cookies)) {
-          if (k.startsWith('sb-') && k.endsWith('-auth-token')) {
-            try {
-              const parsed = JSON.parse(v);
-              if (Array.isArray(parsed) && parsed[0]) {
-                token = parsed[0];
-              } else if (parsed.access_token) {
-                token = parsed.access_token;
+        let fallbackToken = cookies['sb-access-token'] || null;
+        if (!fallbackToken) {
+          for (const [k, v] of Object.entries(cookies)) {
+            if (k.startsWith('sb-') && k.includes('-auth-token')) {
+              try {
+                const parsed = JSON.parse(v);
+                if (Array.isArray(parsed) && parsed[0]) {
+                  fallbackToken = parsed[0];
+                } else if (parsed.access_token) {
+                  fallbackToken = parsed.access_token;
+                }
+              } catch {
+                fallbackToken = v;
               }
-            } catch {
-              token = v;
+              if (fallbackToken) break;
             }
-            break;
+          }
+        }
+
+        if (fallbackToken) {
+          const adminClient = createSupabaseClient(url, key, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          const { data } = await adminClient.auth.getUser(fallbackToken);
+          if (data?.user) {
+            user = data.user;
           }
         }
       }
     }
 
-    if (!token) {
+    if (!user) {
       return {
         user: null,
         userId: null,
@@ -78,21 +131,9 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
       };
     }
 
-    // Verify token with Supabase Auth
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    const supabaseAdmin = createSupabaseClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError || !user) {
-      return {
-        user: null,
-        userId: null,
-        organizationId: null,
-        isAuthenticated: false,
-      };
-    }
 
     // Fetch user's organization membership
     let organizationId: string | null = null;

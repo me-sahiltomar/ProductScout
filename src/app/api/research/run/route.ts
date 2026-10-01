@@ -10,23 +10,19 @@ export const maxDuration = 60; // Allow maximum timeout on Vercel Pro/serverless
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Authenticate user
+    // 1. Authenticate user context (supports both authenticated users and guests)
     const auth = await getAuthContext(req);
-    if (!auth.isAuthenticated) {
-      return NextResponse.json(
-        { error: 'Authentication required to initiate research runs. Please sign in.' },
-        { status: 401 }
-      );
-    }
-
-    // 2. Rate limiting check (5 runs per 10 minutes per tenant)
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'anonymous';
+    const guestId = `guest_${ip.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+    // 2. Rate limiting check (10 runs for authenticated users, 5 for guests per 10 minutes)
     const rateLimitKey = `run:${auth.userId || ip}`;
-    const rateCheck = apiRateLimiter.check(rateLimitKey, 5, 10 * 60 * 1000);
+    const rateLimitMax = auth.isAuthenticated ? 10 : 5;
+    const rateCheck = apiRateLimiter.check(rateLimitKey, rateLimitMax, 10 * 60 * 1000);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         {
-          error: 'Rate limit exceeded. You can initiate up to 5 research runs every 10 minutes.',
+          error: `Rate limit exceeded. You can initiate up to ${rateLimitMax} research runs every 10 minutes.`,
           retryAfterMs: rateCheck.resetInMs,
         },
         {
@@ -90,7 +86,7 @@ export async function POST(req: NextRequest) {
     const pipeline = new ResearchPipeline(repo);
 
     const scope = {
-      userId: auth.userId,
+      userId: auth.userId || guestId,
       organizationId: auth.organizationId,
     };
 

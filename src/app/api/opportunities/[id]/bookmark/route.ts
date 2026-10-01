@@ -12,8 +12,8 @@ export async function POST(
     const auth = await getAuthContext(req);
     if (!auth.isAuthenticated) {
       return NextResponse.json(
-        { error: 'Authentication required to bookmark opportunities.' },
-        { status: 401 }
+        { isSaved: false, requiresAuth: true, error: 'Sign in to save opportunities to your account.' },
+        { status: 200 }
       );
     }
 
