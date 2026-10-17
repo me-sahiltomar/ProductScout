@@ -14,7 +14,7 @@ interface LoginFormProps {
 
 export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
   const router = useRouter();
-  const redirectTarget = getSafeRedirectPath(initialRedirect, '/');
+  const redirectTarget = getSafeRedirectPath(initialRedirect, '/app');
 
   const { signInWithEmail, signInWithGoogle, isAuthenticated, isLoading } = useAuth();
 

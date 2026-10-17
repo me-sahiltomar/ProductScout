@@ -2,7 +2,7 @@ import {
   ClassifiedEvidence, 
   ExtractedProblem, 
   ProductOpportunity, 
-  ResearchRunConfig,
+  ResearchRunConfig, 
   SystemSettings 
 } from '@/types';
 import { normalizeBrief } from './opportunityGenerator';
@@ -27,6 +27,11 @@ export class AIProviderManager {
     problems: ExtractedProblem[];
     opportunities: ProductOpportunity[];
   }> {
+    // If no grounded opportunities exist, do not hallucinate opportunities without evidence
+    if (opportunities.length === 0 || evidence.length === 0) {
+      return { problems, opportunities };
+    }
+
     const geminiKey = process.env.GEMINI_API_KEY || '';
     const openaiKey = process.env.OPENAI_API_KEY || '';
 
@@ -34,13 +39,13 @@ export class AIProviderManager {
       try {
         return await this.enrichWithGemini(config, evidence, problems, opportunities, geminiKey);
       } catch (err) {
-        console.warn('Gemini enrichment failed, falling back to heuristic results:', err);
+        console.warn('Gemini enrichment failed, falling back to grounded heuristic results:', err);
       }
     } else if (this.settings.aiProvider === 'openai' && openaiKey) {
       try {
         return await this.enrichWithOpenAI(config, evidence, problems, opportunities, openaiKey);
       } catch (err) {
-        console.warn('OpenAI enrichment failed, falling back to heuristic results:', err);
+        console.warn('OpenAI enrichment failed, falling back to grounded heuristic results:', err);
       }
     }
 
@@ -59,39 +64,31 @@ export class AIProviderManager {
     const brief = config.brief || normalizeBrief(config);
 
     const prompt = `You are ProductScout's Senior Opportunity Intelligence Architect.
-Analyze these authentic practitioner signals and calibrate the product opportunities against the user's Research Brief.
+Refine and calibrate these ${opportunities.length} grounded candidate opportunities against the user's Research Brief.
+Do not invent ungrounded facts or discard evidence.
 
-CRITICAL RULES:
-1. Ground everything strictly in the provided real-world practitioner evidence. Do not invent fake quotes or statistics.
-2. Clearly distinguish direct evidence from strategic inference.
-3. Calibrate MVP scope to the user's requested Build Horizon (${brief.opportunityProfile.buildHorizon}), Team Size (${brief.opportunityProfile.teamSize}), and Budget (${brief.opportunityProfile.budget}).
-${brief.opportunityProfile.buildHorizon === '7d' ? 'IMPORTANT: Keep scope strictly to a 7-day single workflow MVP with ruthless anti-scope.' : ''}
-${brief.constraints.exclusions.length > 0 ? `STRICT EXCLUSIONS (Do NOT suggest): ${brief.constraints.exclusions.join(', ')}` : ''}
-
-USER RESEARCH BRIEF:
+RESEARCH BRIEF:
 - Subject: ${brief.subject}
 - Objective: ${brief.objective}
 - Target User: ${brief.target.primaryUser || config.targetUser || 'Operators & Practitioners'}
-- Target Industry: ${brief.target.industry || 'Technology & Business Services'}
 - Build Horizon: ${brief.opportunityProfile.buildHorizon}
-- Target Product Types: ${brief.opportunityProfile.productTypes.join(', ')}
 - Priorities: ${brief.constraints.priorities.join(', ')}
-- Risk Tolerance: ${brief.constraints.riskProfile}
+${brief.constraints.exclusions.length > 0 ? `STRICT EXCLUSIONS (Do NOT suggest): ${brief.constraints.exclusions.join(', ')}` : ''}
 
-Evidence Samples:
-${evidence.slice(0, 8).map(e => `- [${e.platform}] ${e.title}: "${e.painQuote || e.snippet}"`).join('\n')}
+CANDIDATE OPPORTUNITIES TO REFINE:
+${opportunities.map((o, i) => `${i + 1}. Title: "${o.title || o.name}" | Problem: "${o.problem || o.userProblem}" | Workflow: "${o.workflow || o.coreWorkflow}"`).join('\n')}
 
-Existing Formulated Opportunities:
-${JSON.stringify(opportunities.map(o => ({ 
-  name: o.name, 
-  opportunityType: o.opportunityType,
-  problem: o.userProblem, 
-  solution: o.proposedSolution, 
-  mvpScope: o.mvpScope,
-  whatNotToBuildInitially: o.whatNotToBuildInitially
-})), null, 2)}
-
-Respond with refined JSON array of opportunities matching schema. If not possible, return [].`;
+For each candidate opportunity above, return a refined JSON object in an array matching this schema:
+{
+  "index": number (1 to ${opportunities.length}),
+  "name": "string (Short clear product name)",
+  "oneLineDescription": "string",
+  "proposedSolution": "string",
+  "whyUseful": "string",
+  "mvpScope": ["string"],
+  "whatNotToBuildInitially": ["string"]
+}
+Return a JSON array of refined objects.`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
@@ -121,24 +118,33 @@ Respond with refined JSON array of opportunities matching schema. If not possibl
       try {
         const parsed = JSON.parse(rawText);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const mergedOpps = opportunities.map((opp, idx) => {
-            const refined = parsed[idx];
-            if (!refined) return opp;
+          // STRICT P0-004 PROVENANCE PRESERVATION:
+          // Augment base opportunities, NEVER discard evidenceQuotes or supporting_evidence
+          const enrichedOpps = opportunities.map((baseOpp, idx) => {
+            const aiRefinement = parsed.find((p: any) => p.index === idx + 1) || parsed[idx];
+            if (!aiRefinement) return baseOpp;
+
             return {
-              ...opp,
-              name: refined.name || opp.name,
-              oneLineDescription: refined.oneLineDescription || opp.oneLineDescription,
-              opportunityType: refined.opportunityType || opp.opportunityType,
-              proposedSolution: refined.proposedSolution || opp.proposedSolution,
-              whyUseful: refined.whyUseful || opp.whyUseful,
-              mvpScope: Array.isArray(refined.mvpScope) && refined.mvpScope.length > 0 ? refined.mvpScope : opp.mvpScope,
-              whatNotToBuildInitially: Array.isArray(refined.whatNotToBuildInitially) && refined.whatNotToBuildInitially.length > 0 ? refined.whatNotToBuildInitially : opp.whatNotToBuildInitially,
+              ...baseOpp,
+              name: aiRefinement.name || baseOpp.name,
+              title: aiRefinement.name || baseOpp.title,
+              oneLineDescription: aiRefinement.oneLineDescription || baseOpp.oneLineDescription,
+              proposedSolution: aiRefinement.proposedSolution || baseOpp.proposedSolution,
+              potential_solution: aiRefinement.proposedSolution || baseOpp.potential_solution,
+              whyUseful: aiRefinement.whyUseful || baseOpp.whyUseful,
+              mvpScope: Array.isArray(aiRefinement.mvpScope) && aiRefinement.mvpScope.length > 0
+                ? aiRefinement.mvpScope
+                : baseOpp.mvpScope,
+              whatNotToBuildInitially: Array.isArray(aiRefinement.whatNotToBuildInitially) && aiRefinement.whatNotToBuildInitially.length > 0
+                ? aiRefinement.whatNotToBuildInitially
+                : baseOpp.whatNotToBuildInitially,
             };
           });
-          return { problems, opportunities: mergedOpps };
+
+          return { problems, opportunities: enrichedOpps };
         }
       } catch (parseErr) {
-        console.warn('Could not parse Gemini JSON response:', parseErr);
+        console.warn('Could not parse Gemini JSON response:', parseErr, rawText);
       }
     }
 
@@ -157,11 +163,16 @@ Respond with refined JSON array of opportunities matching schema. If not possibl
     const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
     const brief = config.brief || normalizeBrief(config);
 
-    const prompt = `Refine and calibrate these product opportunities based on real user evidence and the research brief.
+    const prompt = `Refine and calibrate these ${opportunities.length} grounded candidate opportunities against the research brief.
 Subject: "${brief.subject}".
 Build Horizon: "${brief.opportunityProfile.buildHorizon}".
-Target: "${brief.target.primaryUser || config.targetUser || 'Operators'}".
-Return JSON array with refined fields: name, oneLineDescription, opportunityType, proposedSolution, whyUseful, mvpScope, whatNotToBuildInitially.`;
+Priorities: "${brief.constraints.priorities.join(', ')}".
+${brief.constraints.exclusions.length > 0 ? `Exclusions: ${brief.constraints.exclusions.join(', ')}` : ''}
+
+Opportunities:
+${opportunities.map((o, i) => `${i + 1}. "${o.title || o.name}" for "${o.problem || o.userProblem}"`).join('\n')}
+
+Return a JSON array of refined objects with: index (1 to ${opportunities.length}), name, oneLineDescription, proposedSolution, whyUseful, mvpScope (array), whatNotToBuildInitially (array).`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
@@ -175,7 +186,7 @@ Return JSON array with refined fields: name, oneLineDescription, opportunityType
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: 'You are ProductScout Opportunity Intelligence. Always output valid JSON array.' },
+          { role: 'system', content: 'You are ProductScout Opportunity Intelligence. Always output valid JSON array refining the given opportunities.' },
           { role: 'user', content: prompt }
         ],
         response_format: { type: 'json_object' },
@@ -186,8 +197,41 @@ Return JSON array with refined fields: name, oneLineDescription, opportunityType
 
     clearTimeout(timeout);
 
-    if (!res.ok) {
-      throw new Error(`OpenAI API error ${res.status}`);
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (content) {
+      try {
+        const parsed = JSON.parse(content);
+        const list = Array.isArray(parsed) ? parsed : (parsed.opportunities || parsed.items || []);
+        if (Array.isArray(list) && list.length > 0) {
+          // STRICT P0-004 PROVENANCE PRESERVATION:
+          const enrichedOpps = opportunities.map((baseOpp, idx) => {
+            const aiRefinement = list.find((p: any) => p.index === idx + 1) || list[idx];
+            if (!aiRefinement) return baseOpp;
+
+            return {
+              ...baseOpp,
+              name: aiRefinement.name || baseOpp.name,
+              title: aiRefinement.name || baseOpp.title,
+              oneLineDescription: aiRefinement.oneLineDescription || baseOpp.oneLineDescription,
+              proposedSolution: aiRefinement.proposedSolution || baseOpp.proposedSolution,
+              potential_solution: aiRefinement.proposedSolution || baseOpp.potential_solution,
+              whyUseful: aiRefinement.whyUseful || baseOpp.whyUseful,
+              mvpScope: Array.isArray(aiRefinement.mvpScope) && aiRefinement.mvpScope.length > 0
+                ? aiRefinement.mvpScope
+                : baseOpp.mvpScope,
+              whatNotToBuildInitially: Array.isArray(aiRefinement.whatNotToBuildInitially) && aiRefinement.whatNotToBuildInitially.length > 0
+                ? aiRefinement.whatNotToBuildInitially
+                : baseOpp.whatNotToBuildInitially,
+            };
+          });
+
+          return { problems, opportunities: enrichedOpps };
+        }
+      } catch (e) {
+        console.warn('Could not parse OpenAI JSON response:', e, content);
+      }
     }
 
     return { problems, opportunities };

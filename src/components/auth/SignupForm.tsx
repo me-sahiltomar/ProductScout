@@ -13,7 +13,7 @@ interface SignupFormProps {
 
 export function SignupForm({ initialRedirect }: SignupFormProps) {
   const router = useRouter();
-  const redirectTarget = getSafeRedirectPath(initialRedirect, '/');
+  const redirectTarget = getSafeRedirectPath(initialRedirect, '/app');
 
   const { signUpWithEmail, signInWithGoogle, isAuthenticated, isLoading } = useAuth();
 

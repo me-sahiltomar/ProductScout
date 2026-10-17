@@ -33,7 +33,7 @@ export interface RunSummary {
   topic: string;
   timeframe: string;
   focus: string;
-  status: 'pending' | 'collecting' | 'analyzing' | 'completed' | 'failed';
+  status: string;
   sourcesCount: number;
   problemsCount: number;
   opportunitiesCount: number;

@@ -1,4 +1,4 @@
-import { ClassifiedEvidence, EvidenceQuality, EvidenceType, RawEvidenceItem } from '@/types';
+import { ClassifiedEvidence, EvidenceQuality, EvidenceType, RawEvidenceItem, ResearchRunConfig } from '@/types';
 
 export class EvidenceFilter {
   private firstHandPatterns = [
@@ -21,7 +21,7 @@ export class EvidenceFilter {
     /\b(?:what are you using for|how to automate|looking for a simple)\b/i,
   ];
 
-  public classify(item: RawEvidenceItem): ClassifiedEvidence {
+  public classify(item: RawEvidenceItem, briefConfig?: ResearchRunConfig): ClassifiedEvidence {
     const text = `${item.title} ${item.content}`;
     const detectedMarkers: string[] = [];
     let score = 50;
@@ -80,6 +80,50 @@ export class EvidenceFilter {
       quality = 'MEDIUM';
     }
 
+    // Domain & Geography Relevance Evaluation
+    let relevance: 'RELEVANT' | 'PARTIALLY_RELEVANT' | 'IRRELEVANT' | 'UNCERTAIN' = 'UNCERTAIN';
+    let relevanceScore = 50;
+
+    if (briefConfig) {
+      const topic = (briefConfig.topic || briefConfig.brief?.subject || '').toLowerCase();
+      const targetUser = (briefConfig.targetUser || briefConfig.brief?.target?.primaryUser || '').toLowerCase();
+      const industry = (briefConfig.industry || briefConfig.brief?.target?.industry || '').toLowerCase();
+      const geography = (briefConfig.geography || briefConfig.brief?.target?.geography || '').toLowerCase();
+
+      const stopWords = new Set([
+        'what', 'when', 'where', 'which', 'with', 'from', 'tool', 'tools', 'software',
+        'find', 'best', 'need', 'help', 'about', 'some', 'many', 'more', 'most'
+      ]);
+      const domainTerms = `${topic} ${targetUser} ${industry}`
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !stopWords.has(w));
+
+      const evFullText = text.toLowerCase();
+      let matchCount = 0;
+      for (const term of domainTerms) {
+        if (evFullText.includes(term)) matchCount++;
+      }
+
+      const matchRatio = domainTerms.length > 0 ? matchCount / domainTerms.length : 0;
+      const isGeoConstrained = geography && !['global', 'worldwide', 'any', 'all'].includes(geography);
+      const mentionsGeo = isGeoConstrained && evFullText.includes(geography);
+
+      if (domainTerms.length > 0 && matchCount === 0) {
+        relevance = 'IRRELEVANT';
+        relevanceScore = 10;
+      } else if (matchRatio >= 0.4 || matchCount >= 2) {
+        relevance = 'RELEVANT';
+        relevanceScore = Math.min(95, 60 + matchCount * 10 + (mentionsGeo ? 15 : 0));
+      } else if (matchCount >= 1) {
+        relevance = 'PARTIALLY_RELEVANT';
+        relevanceScore = Math.min(75, 40 + matchCount * 15 + (mentionsGeo ? 15 : 0));
+      } else {
+        relevance = 'UNCERTAIN';
+        relevanceScore = 40;
+      }
+    }
+
     const rawPainQuote = this.extractPainSnippet(item.content) || item.title;
     const cleanTitle = this.decodeHtml(item.title);
     const cleanSnippet = this.decodeHtml(item.content.slice(0, 320));
@@ -97,6 +141,8 @@ export class EvidenceFilter {
       evidenceType,
       quality,
       qualityScore,
+      relevance,
+      relevanceScore,
       firstHandMarkers: Array.from(new Set(detectedMarkers)),
       painQuote: cleanPainQuote,
     };
@@ -113,11 +159,20 @@ export class EvidenceFilter {
       .replace(/&nbsp;/g, ' ');
   }
 
-  public classifyAll(items: RawEvidenceItem[]): ClassifiedEvidence[] {
+  public classifyAll(items: RawEvidenceItem[], briefConfig?: ResearchRunConfig): ClassifiedEvidence[] {
     return items
-      .map(item => this.classify(item))
-      .filter(ev => ev.evidenceType !== 'VENDOR_MARKETING' || ev.qualityScore > 45)
-      .sort((a, b) => b.qualityScore - a.qualityScore);
+      .map(item => this.classify(item, briefConfig))
+      .filter(ev => {
+        if (ev.evidenceType === 'VENDOR_MARKETING' && ev.qualityScore <= 45) return false;
+        // Strictly filter out completely irrelevant items when a brief is configured
+        if (briefConfig && ev.relevance === 'IRRELEVANT') return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const scoreA = (a.relevanceScore || 50) * 0.4 + a.qualityScore * 0.6;
+        const scoreB = (b.relevanceScore || 50) * 0.4 + b.qualityScore * 0.6;
+        return scoreB - scoreA;
+      });
   }
 
   private extractPainSnippet(content: string): string | undefined {

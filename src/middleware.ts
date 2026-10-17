@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
     const target =
       rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
         ? rawRedirect
-        : '/';
+        : '/app';
     return NextResponse.redirect(new URL(target, request.url));
   }
 

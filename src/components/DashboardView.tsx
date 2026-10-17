@@ -73,11 +73,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-8 pb-16 animate-fade-in">
       {/* Hero Section with Glass Specular Depth */}
-      <div className="relative overflow-hidden rounded-2xl glass-panel p-6 sm:p-8 md:p-10">
-        <div className="relative z-10 max-w-3xl">
+      <div className="relative overflow-hidden rounded-2xl glass-panel p-6 sm:p-8 md:p-10 lg:p-12">
+        <div className="relative z-10 max-w-4xl lg:max-w-5xl xl:max-w-6xl">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <div className="badge-mono inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono text-zinc-300">
-              <Radio className="w-3 h-3 text-zinc-400" />
+              <Radio className="w-3.5 h-3.5 text-zinc-400" />
               <span>Problem-First Product Intelligence</span>
             </div>
 
@@ -97,7 +97,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
 
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.15]">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-[1.12]">
             <span className="silver-gradient-text block">
               Discover real problems.
             </span>
@@ -106,7 +106,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
           </h1>
 
-          <p className="mt-4 text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-2xl">
+          <p className="mt-4 text-xs sm:text-sm md:text-base text-zinc-400 leading-relaxed max-w-3xl">
             ProductScout monitors authentic discussions across Reddit, Hacker News, GitHub, and operator communities. It discovers real user problems, inspects existing workarounds, detects market gaps, and formulates 20-field opportunity profiles with narrow MVP scopes.
           </p>
 
@@ -150,7 +150,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         <div className="glass-card p-4 sm:p-5 rounded-xl">
           <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1 flex items-center justify-between">
             <span>Research Runs</span>
@@ -197,7 +197,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {curatedBlueprints.map((t, idx) => (
             <div
               key={idx}

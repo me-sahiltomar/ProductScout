@@ -1,4 +1,4 @@
-import { ExistingSolution, MarketGap, ProblemCluster, ExtractedProblem, ClassifiedEvidence } from '@/types';
+import { ExistingSolution, MarketGap, ProblemCluster, ExtractedProblem, ClassifiedEvidence, CommercialSignal } from '@/types';
 
 export class SolutionGapAnalyzer {
   public analyze(
@@ -8,22 +8,39 @@ export class SolutionGapAnalyzer {
   ): {
     solutions: ExistingSolution[];
     gaps: MarketGap[];
+    commercialSignals: CommercialSignal[];
   } {
     const solutions: ExistingSolution[] = [];
     const gaps: MarketGap[] = [];
+    const commercialSignals: CommercialSignal[] = [];
 
     const probMap = new Map<string, ExtractedProblem>();
     problems.forEach(p => probMap.set(p.id, p));
 
-    for (const cluster of clusters) {
-      const clusterProbs = cluster.problemIds.map(id => probMap.get(id)).filter((p): p is ExtractedProblem => !!p);
-      const clusterText = clusterProbs.map(p => `${p.problemStatement} ${p.currentWorkaround} ${p.whyPainful}`).join(' ').toLowerCase();
+    const evidenceMap = new Map<string, ClassifiedEvidence>();
+    evidenceList.forEach(e => evidenceMap.set(e.id, e));
 
-      const clusterSolutions = this.identifySolutions(cluster.clusterName, clusterText);
+    for (const cluster of clusters) {
+      const clusterProbs = cluster.problemIds
+        .map(id => probMap.get(id))
+        .filter((p): p is ExtractedProblem => !!p);
+
+      const clusterEvidenceIds = Array.from(new Set(clusterProbs.flatMap(p => p.evidenceIds)));
+      const clusterEvidence = clusterEvidenceIds
+        .map(id => evidenceMap.get(id))
+        .filter((e): e is ClassifiedEvidence => !!e);
+
+      // 1. Identify solutions grounded in actual evidence (NO HARDCODED HUBSPOT / ZAPIER)
+      const clusterSolutions = this.identifySolutions(cluster, clusterProbs, clusterEvidence);
       solutions.push(...clusterSolutions);
 
-      const clusterGaps = this.detectGapsForCluster(cluster, clusterProbs, clusterSolutions);
+      // 2. Detect gaps based on real solutions & evidence
+      const clusterGaps = this.detectGapsForCluster(cluster, clusterProbs, clusterSolutions, clusterEvidence);
       gaps.push(...clusterGaps);
+
+      // 3. Extract commercial signals grounded in matching evidence items only
+      const signals = this.extractCommercialSignals(cluster.clusterName, clusterEvidence);
+      commercialSignals.push(...signals);
     }
 
     const uniqueSolutions: ExistingSolution[] = [];
@@ -38,88 +55,91 @@ export class SolutionGapAnalyzer {
     return {
       solutions: uniqueSolutions,
       gaps,
+      commercialSignals
     };
   }
 
-  private identifySolutions(clusterName: string, text: string): ExistingSolution[] {
+  private identifySolutions(
+    cluster: ProblemCluster,
+    probs: ExtractedProblem[],
+    evidenceList: ClassifiedEvidence[]
+  ): ExistingSolution[] {
     const solutions: ExistingSolution[] = [];
+    const seenSolutionNames = new Set<string>();
 
-    if (/lead|crm|sales/i.test(clusterName)) {
+    // 1. Grounded Workaround Solutions: extract from problems that observed real workarounds
+    for (const p of probs) {
+      if (p.workaroundType && p.workaroundType !== 'none' && p.currentWorkaround && p.currentWorkaround !== 'Unknown/Manual') {
+        const workaroundName = p.currentWorkaround;
+        if (!seenSolutionNames.has(workaroundName.toLowerCase())) {
+          seenSolutionNames.add(workaroundName.toLowerCase());
+          solutions.push({
+            id: `sol_workaround_${cluster.id}_${p.id}`,
+            name: workaroundName,
+            type: 'manual_workaround',
+            targetUser: p.targetUser,
+            whatUsersDo: `Operators manually use ${workaroundName} to address ${p.problemStatement.slice(0, 80)}.`,
+            positiveAspects: ['Immediate low-cost stopgap without new software procurement'],
+            complaints: [p.whyPainful || 'Requires repetitive manual intervention'],
+            missingFunctionality: ['Automated synchronization and self-healing error handling'],
+            integrationLimitations: ['Limited to manual spreadsheet export/import boundaries.'],
+            complexityFriction: 'Context-switching and fragile manual data entry.',
+            unservedSegments: p.targetUser,
+            switchingCosts: 'Low (Ad-hoc operational habits)',
+            evidenceIds: p.evidenceIds.filter(id => evidenceList.some(e => e.id === id)),
+            investigationStatus: 'RESEARCHED'
+          });
+        }
+      }
+    }
+
+    // 2. Scan evidence for explicitly named tools/software
+    const toolRegex = /\b(?:using|tried|tested|switched from|alternative to|look at|recommend)\s+([A-Z][a-zA-Z0-9_\-\.]+)\b/g;
+    const invalidToolWords = new Set(['Google', 'Reddit', 'Hacker', 'GitHub', 'Dev', 'This', 'That', 'The', 'My', 'Our', 'Some', 'Any', 'What', 'How', 'Why']);
+
+    for (const ev of evidenceList) {
+      const text = `${ev.title} ${ev.snippet}`;
+      let match: RegExpExecArray | null;
+      while ((match = toolRegex.exec(text)) !== null) {
+        const candidateTool = match[1].trim();
+        if (candidateTool.length > 2 && !invalidToolWords.has(candidateTool) && !seenSolutionNames.has(candidateTool.toLowerCase())) {
+          seenSolutionNames.add(candidateTool.toLowerCase());
+          solutions.push({
+            id: `sol_tool_${cluster.id}_${candidateTool.toLowerCase()}`,
+            name: candidateTool,
+            type: 'competitor',
+            targetUser: probs[0]?.targetUser || 'Operators',
+            whatUsersDo: `Referenced by practitioners in discussion: "${match[0]}"`,
+            positiveAspects: ['Existing market recognition in this domain'],
+            complaints: ['Users in evidence discussions seek alternatives or express friction with current setup'],
+            missingFunctionality: ['Full automated alignment with practitioner workflow'],
+            integrationLimitations: ['Integration limits and API rate restrictions cited in discussions.'],
+            complexityFriction: 'Tool configuration or integration boundaries.',
+            unservedSegments: probs[0]?.targetUser || 'Specialized operators',
+            switchingCosts: 'High (Data migration, team retraining, and vendor lock-in)',
+            evidenceIds: [ev.id],
+            investigationStatus: 'RESEARCHED'
+          });
+        }
+      }
+    }
+
+    // 3. If NO commercial software or workarounds found in source evidence:
+    // STRICT P0 INVARIANT: Never insert fake HubSpot or Zapier!
+    if (solutions.length === 0) {
       solutions.push({
-        name: 'HubSpot / Salesforce Essentials',
+        id: `sol_none_${cluster.id}`,
+        name: 'No commercial solutions identified in source evidence',
         type: 'software_product',
-        whatUsersDo: 'Set up contact forms, manually import CSVs, and trigger canned email sequences.',
-        positiveAspects: ['Robust database', 'Broad ecosystem of marketplace apps', 'Recognized brand'],
-        complaints: ['Aggressive tier-based pricing lock-in', 'Overwhelming UI with hundreds of unused menus', 'Steep setup curve for solo operators'],
-        missingFunctionality: ['Autonomous inbound lead qualification via natural conversation', 'Instant two-way WhatsApp/SMS synchronization without enterprise add-ons'],
-        pricingInfo: 'Starts at $20/mo, quickly escalates to $500+/mo for automation workflows',
-        integrationLimitations: ['Requires paid Zapier/Make tiers for custom webhooks and custom databases'],
-        complexityFriction: 'Excessive configuration overhead requiring certified consultants or weeks of trial-and-error.',
-        unservedSegments: 'Solo service providers, micro-agencies, and non-technical trade business owners.',
-      });
-      solutions.push({
-        name: 'Manual Google Sheets & Email Sequences',
-        type: 'spreadsheets',
-        whatUsersDo: 'Operators copy-paste lead details from web forms into Google Sheets and manually send template emails.',
-        positiveAspects: ['Zero software license cost', 'Completely customizable columns', 'Zero learning curve'],
-        complaints: ['Prone to forgetting follow-ups', 'Zero real-time alerts', 'Leads go cold after 30 minutes'],
-        missingFunctionality: ['Automated reminders', 'CRM pipeline status synchronization', 'Enrichment of lead company data'],
-        pricingInfo: 'Free ($0)',
-        integrationLimitations: ['Manual human copy-paste required for every new entry'],
-        complexityFriction: 'High continuous manual toil consuming 5-10 hours weekly.',
-        unservedSegments: 'Any operator receiving more than 10 leads per week.',
-      });
-    } else if (/invoice|billing|accounting/i.test(clusterName)) {
-      solutions.push({
-        name: 'QuickBooks Online / Xero',
-        type: 'software_product',
-        whatUsersDo: 'Create invoices, connect bank feeds, and categorize transactions monthly.',
-        positiveAspects: ['Certified tax compliance', 'Accountant familiarity', 'Direct bank synchronization'],
-        complaints: ['Slow, cluttered web UI', 'Hard to track whether clients actually opened invoice links', 'Strict reconciliation errors'],
-        missingFunctionality: ['Automated smart payment chasing with escalating SMS/email nudges', 'Instant line-item dispute handling'],
-        pricingInfo: '$30 - $90 per month per organization',
-        integrationLimitations: ['Clunky APIs for custom order/fulfillment systems'],
-        complexityFriction: 'Designed for accountants, not operators, creating cognitive friction.',
-        unservedSegments: 'Freelancers and small agencies with simple milestone billing needs.',
-      });
-    } else if (/support|customer|inbox/i.test(clusterName)) {
-      solutions.push({
-        name: 'Zendesk / Intercom Helpdesk',
-        type: 'software_product',
-        whatUsersDo: 'Route inbound customer inquiries into shared ticketing inboxes with manual macros.',
-        positiveAspects: ['Omnichannel support', 'Good audit trail and team assignment', 'Extensive analytics'],
-        complaints: ['High per-seat pricing', 'Robotic-sounding native bot add-ons costing extra', 'Complex routing rules'],
-        missingFunctionality: ['Instant context lookup in internal order systems without expensive custom engineering', 'Safe autonomous draft generation for non-technical teams'],
-        pricingInfo: '$55 - $115 per seat per month',
-        integrationLimitations: ['Custom database queries require expensive developer seats and webhook setups'],
-        complexityFriction: 'Heavy configuration and rule management required.',
-        unservedSegments: 'Small eCommerce stores and local service businesses with 1-5 support staff.',
-      });
-    } else if (/document|pdf|extraction/i.test(clusterName)) {
-      solutions.push({
-        name: 'Generic OCR / Manual Data Entry',
-        type: 'manual_workaround',
-        whatUsersDo: 'Staff open PDF invoices or contracts on one screen and re-type vendor names, amounts, and dates into software.',
-        positiveAspects: ['100% human verification accuracy for simple layouts'],
-        complaints: ['Extremely slow and monotonous', 'Prone to typographical errors when tired', 'Costly in wage hours'],
-        missingFunctionality: ['Instant structured JSON output without manual correction', 'Direct push into accounting tools'],
-        pricingInfo: '$15 - $25 per hour of employee time',
-        integrationLimitations: ['Manual human bridge between tools'],
-        complexityFriction: 'Mind-numbing repetitive labor leading to staff turnover.',
-        unservedSegments: 'Businesses processing 20-200 documents weekly that cannot afford $10,000 enterprise document AI.',
-      });
-    } else {
-      solutions.push({
-        name: 'Multi-tool Zapier / Make Glue Workarounds',
-        type: 'existing_tool',
-        whatUsersDo: 'Stitch together 4-7 SaaS tools with webhooks and multi-step Zapier workflows.',
-        positiveAspects: ['Enables inter-tool connection without custom code'],
-        complaints: ['Silent automation failures when schemas change', 'Rapidly escalating task charges', 'Debugging failed runs is a nightmare'],
-        missingFunctionality: ['Self-healing connectors', 'Domain-specific business logic out of the box'],
-        pricingInfo: '$29 - $120+ per month depending on task volume',
-        integrationLimitations: ['Rate limits and payload timeout errors'],
-        complexityFriction: 'Operators fear touching existing working automations because they break easily.',
-        unservedSegments: 'Non-technical business owners wanting a turnkey outcome, not a workflow builder.',
+        whatUsersDo: 'No commercial market leader or dedicated software was explicitly referenced in the investigated practitioner signals.',
+        positiveAspects: [],
+        complaints: [],
+        missingFunctionality: [],
+        integrationLimitations: [],
+        complexityFriction: 'Unknown: Market lacks cited dedicated tooling in retrieved discussions.',
+        unservedSegments: probs[0]?.targetUser || 'Operators in this workflow',
+        evidenceIds: [],
+        investigationStatus: 'NO_RELEVANT_SOLUTION_FOUND'
       });
     }
 
@@ -129,42 +149,106 @@ export class SolutionGapAnalyzer {
   private detectGapsForCluster(
     cluster: ProblemCluster,
     probs: ExtractedProblem[],
-    solutions: ExistingSolution[]
+    solutions: ExistingSolution[],
+    evidenceList: ClassifiedEvidence[]
   ): MarketGap[] {
     const gaps: MarketGap[] = [];
-    const allEvidenceIds = probs.flatMap(p => p.evidenceIds);
+    const allEvidenceIds = probs.flatMap(p => p.evidenceIds).filter(id => evidenceList.some(e => e.id === id));
     const quotes = probs.flatMap(p => p.evidenceQuotes.map(q => q.quote)).slice(0, 3);
 
-    gaps.push({
-      id: `gap_${cluster.id}_1`,
-      gapType: 'excessive_complexity',
-      title: 'Incumbent solutions are over-engineered for enterprise teams and bloated for lean operators',
-      description: `Existing market leaders like ${solutions[0]?.name || 'traditional software'} demand extensive onboarding, seat licenses, and complex configuration that small operators abandon in favor of spreadsheets.`,
-      supportingEvidenceIds: allEvidenceIds.slice(0, 2),
-      supportingQuotes: quotes,
-      isAiInference: false,
-    });
+    const hasRealCompetitor = solutions.some(s => s.type === 'competitor' && s.investigationStatus === 'RESEARCHED');
+    const hasWorkaround = solutions.some(s => s.type === 'manual_workaround');
 
-    gaps.push({
-      id: `gap_${cluster.id}_2`,
-      gapType: 'too_many_manual_steps',
-      title: 'Persistent manual data bridging and lack of end-to-end task completion',
-      description: `While tools store records, operators still spend hours manually transferring data between systems or manually monitoring statuses, creating operational lag.`,
-      supportingEvidenceIds: allEvidenceIds.slice(0, 2),
-      supportingQuotes: quotes.slice(1, 3),
-      isAiInference: false,
-    });
-
-    gaps.push({
-      id: `gap_${cluster.id}_3`,
-      gapType: 'high_price',
-      title: 'Prohibitive per-seat pricing penalizing collaborative lean teams',
-      description: `Enterprise SaaS vendors restrict essential automation and API capabilities to top tiers ($100+/seat/mo), leaving budget-conscious founders locked out of productive automation.`,
-      supportingEvidenceIds: [],
-      supportingQuotes: [],
-      isAiInference: true,
-    });
+    if (hasRealCompetitor) {
+      const competitor = solutions.find(s => s.type === 'competitor')!;
+      gaps.push({
+        id: `gap_${cluster.id}_1`,
+        gapType: 'excessive_complexity',
+        title: `Existing tool (${competitor.name}) leaves practitioner workflow gaps`,
+        description: `Discussions referencing ${competitor.name} highlight friction in full workflow automation, prompting users to seek dedicated alternatives.`,
+        supportingEvidenceIds: competitor.evidenceIds || allEvidenceIds.slice(0, 2),
+        supportingQuotes: quotes,
+        isAiInference: true,
+      });
+    } else if (hasWorkaround) {
+      gaps.push({
+        id: `gap_${cluster.id}_1`,
+        gapType: 'too_many_manual_steps',
+        title: 'Manual workaround reliance without dedicated automation',
+        description: `Operators are reliant on ad-hoc manual steps (${solutions[0].name}) because no dedicated automated product has captured this specific workflow.`,
+        supportingEvidenceIds: allEvidenceIds.slice(0, 2),
+        supportingQuotes: quotes,
+        isAiInference: false,
+      });
+    } else {
+      gaps.push({
+        id: `gap_${cluster.id}_1`,
+        gapType: 'lack_of_automation',
+        title: 'Unserved workflow with no prominent tooling identified',
+        description: 'Retrieved practitioner signals report friction with no established commercial software identified in source discussions.',
+        supportingEvidenceIds: allEvidenceIds.slice(0, 2),
+        supportingQuotes: quotes,
+        isAiInference: true,
+      });
+    }
 
     return gaps;
+  }
+
+  private extractCommercialSignals(
+    clusterName: string,
+    evidenceList: ClassifiedEvidence[]
+  ): CommercialSignal[] {
+    const signals: CommercialSignal[] = [];
+    
+    // Find evidence items with authentic payment / spending markers
+    const paidEvs: ClassifiedEvidence[] = [];
+    const timeLossEvs: ClassifiedEvidence[] = [];
+    const sentimentEvs: ClassifiedEvidence[] = [];
+
+    for (const ev of evidenceList) {
+      const text = `${ev.title} ${ev.snippet}`.toLowerCase();
+      if (/\b(paid|paying|dollars|expensive|budget|contractor|hired|thousands|monthly fee|subscription cost)\b/i.test(text)) {
+        paidEvs.push(ev);
+      }
+      if (/\b(takes hours|wasted days?|weekend|slows us down|lost time|lost money)\b/i.test(text)) {
+        timeLossEvs.push(ev);
+      }
+      if (/\b(wish there was|someone should build|would love a tool|need a tool)\b/i.test(text)) {
+        sentimentEvs.push(ev);
+      }
+    }
+
+    if (paidEvs.length > 0) {
+      signals.push({
+        id: `sig_${Date.now()}_1`,
+        description: 'Practitioners cite direct monetary spending on workarounds, contractors, or premium tiers.',
+        strength: 'STRONG',
+        type: 'PAID_WORKAROUND',
+        evidenceIds: paidEvs.map(e => e.id)
+      });
+    }
+
+    if (timeLossEvs.length > 0) {
+      signals.push({
+        id: `sig_${Date.now()}_2`,
+        description: 'Practitioners report quantifiable operational time drag and productivity loss.',
+        strength: 'STRONG',
+        type: 'TIME_LOSS',
+        evidenceIds: timeLossEvs.map(e => e.id)
+      });
+    }
+
+    if (sentimentEvs.length > 0 && paidEvs.length === 0) {
+      signals.push({
+        id: `sig_${Date.now()}_3`,
+        description: 'Users express feature requests or desires without verified willingness-to-pay signals.',
+        strength: 'WEAK',
+        type: 'GENERIC_SENTIMENT',
+        evidenceIds: sentimentEvs.map(e => e.id)
+      });
+    }
+
+    return signals;
   }
 }

@@ -130,7 +130,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               {brief?.subject || run.config.topic}
             </h1>
             {(brief?.intent || run.config.focus) && (
-              <p className="text-xs text-zinc-400 mt-1 max-w-3xl truncate">
+              <p className="text-xs text-zinc-400 mt-1 max-w-4xl lg:max-w-5xl truncate">
                 "{brief?.intent || run.config.focus}"
               </p>
             )}
@@ -193,7 +193,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
         )}
 
         {/* Quick Metrics Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-zinc-900">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-5 mt-4 pt-4 border-t border-zinc-900">
           <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/80">
             <span className="text-[10px] font-mono uppercase text-zinc-500 block">Sources Evaluated</span>
             <span className="text-lg font-semibold text-white">{run.coverage.sourcesCollectedCount}</span>
@@ -305,7 +305,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
             {run.opportunities.map((opp) => (
               <OpportunityCard
                 key={opp.id}
@@ -403,7 +403,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
               {run.gaps.map((gap) => (
                 <div key={gap.id} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
                   <div className="flex items-center justify-between">
@@ -431,7 +431,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
               {run.existingSolutions.map((sol, i) => (
                 <div key={i} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5">
                   <div className="flex items-center justify-between">
@@ -541,7 +541,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
             {run.opportunities.map((opp) => (
               <div key={opp.id} className="p-5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3.5">
                 <div className="flex items-center justify-between border-b border-zinc-850 pb-2">
@@ -587,7 +587,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               No weak signals segregated for this run; all discovered friction points met multi-source verification standards.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
               {run.weakSignals.map((ws) => (
                 <div key={ws.id} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
                   <div className="flex items-center justify-between text-[11px]">
@@ -619,7 +619,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
             <div className="border border-zinc-800 rounded-xl bg-zinc-950 p-4 space-y-2.5">
               <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-400">
                 Connected Platforms

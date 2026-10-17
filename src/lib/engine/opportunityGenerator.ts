@@ -1,318 +1,300 @@
 import { 
   ExtractedProblem, 
   MarketGap, 
-  MvpBuildProfile, 
-  OpportunityType,
   ProblemCluster, 
   ProductOpportunity, 
   ResearchBrief, 
-  ResearchRunConfig, 
-  ValidationExperiment 
+  ResearchRunConfig,
+  ExistingSolution,
+  CommercialSignal,
+  VerifiedClaim
 } from '@/types';
-import { AdaptiveEvaluator } from './adaptiveEvaluator';
-import { ValidationEngine } from './validationEngine';
 
 export function normalizeBrief(config: ResearchRunConfig): ResearchBrief {
   if (config.brief) return config.brief;
   return {
     objective: 'find_product_opportunities',
     subject: config.topic,
-    intent: config.focus || `Investigate authentic operational complaints and workflow friction in "${config.topic}".`,
-    target: {
-      primaryUser: config.targetUser || 'B2B Operators & Practitioners',
-      targetUser: config.targetUser || 'B2B Operators & Practitioners',
-      targetCompany: 'SMB',
-      companySize: '11–50',
-      industry: config.industry || 'Software & Business Services',
-      geography: config.geography || 'Global',
-      workflow: config.focus || 'Core operational tasks',
-    },
-    opportunityProfile: {
-      productTypes: ['SaaS', 'Micro-SaaS'],
-      buildHorizon: config.timeframe === '7d' ? '7d' : '1m',
+    intent: config.focus || `Investigate operational complaints in "${config.topic}".`,
+    target: { primaryUser: config.targetUser || 'B2B Operators' },
+    opportunityProfile: { 
+      productTypes: ['SaaS'],
+      buildHorizon: '1m',
       teamSize: 'Solo',
       technicalCapability: 'Full-stack developer',
-      budget: 'Moderate',
-      existingAdvantages: ['Domain expertise'],
-      distributionAccess: 'Community',
+      budget: 'Low',
+      existingAdvantages: [],
+      distributionAccess: 'Community'
     },
-    researchConfiguration: {
-      evidenceWindow: (config.timeframe as any) || '30d',
-      depth: 'standard',
-      sources: config.enabledSources || ['reddit', 'hacker_news', 'github', 'devto', 'web'],
-      maxSources: config.maxSources || 30,
-    },
-    constraints: {
-      priorities: ['High pain', 'Manual workflow', 'Commercial intent'],
-      exclusions: [],
-      riskProfile: 'balanced',
-    },
+    researchConfiguration: { evidenceWindow: '30d', depth: 'standard', sources: ['web'], maxSources: 30 },
+    constraints: { priorities: ['High pain'], exclusions: [], riskProfile: 'balanced' },
   };
 }
 
 export class OpportunityGenerator {
-  private evaluator: AdaptiveEvaluator;
-  private validationEngine: ValidationEngine;
-
-  constructor() {
-    this.evaluator = new AdaptiveEvaluator();
-    this.validationEngine = new ValidationEngine();
-  }
+  public lastRejectedCandidates: Array<{
+    id: string;
+    title: string;
+    problem: string;
+    rejectionReason: string;
+    evidenceCount: number;
+    evidenceIds: string[];
+  }> = [];
 
   public generateOpportunities(
     clusters: ProblemCluster[],
     problems: ExtractedProblem[],
     gaps: MarketGap[],
+    solutions: ExistingSolution[],
+    commercialSignals: CommercialSignal[],
+    verifiedClaims: VerifiedClaim[],
     config: ResearchRunConfig
   ): ProductOpportunity[] {
     const brief = normalizeBrief(config);
     const opportunities: ProductOpportunity[] = [];
+    this.lastRejectedCandidates = [];
+
     const probMap = new Map<string, ExtractedProblem>();
     problems.forEach(p => probMap.set(p.id, p));
 
     for (const cluster of clusters) {
-      const clusterProbs = cluster.problemIds
-        .map(id => probMap.get(id))
-        .filter((p): p is ExtractedProblem => !!p);
-
+      const clusterProbs = cluster.problemIds.map(id => probMap.get(id)).filter((p): p is ExtractedProblem => !!p);
       if (clusterProbs.length === 0) continue;
 
       const primaryProblem = clusterProbs[0];
       const relevantGap = gaps.find(g => g.id.includes(cluster.id)) || gaps[0];
+      const relevantSignals = commercialSignals.filter(s => primaryProblem.evidenceIds.some(eid => s.evidenceIds.includes(eid)));
+      
+      const candidateTitle = `Automated ${cluster.clusterName}`;
+      
+      // 1. EVIDENCE GATES: Validate core pain, exclusions & non-announcement authenticity
+      const gateResult = this.evaluateEvidenceGate(primaryProblem, relevantSignals, cluster, brief);
+      if (!gateResult.passed) {
+        this.lastRejectedCandidates.push({
+          id: `rej_${cluster.id}`,
+          title: candidateTitle,
+          problem: primaryProblem.problemStatement,
+          rejectionReason: gateResult.reason,
+          evidenceCount: primaryProblem.evidenceIds.length,
+          evidenceIds: primaryProblem.evidenceIds
+        });
+        continue;
+      }
 
-      const opp = this.buildOpportunityForCluster(cluster, primaryProblem, relevantGap, brief);
+      const opp = this.buildOpportunityForCluster(cluster, primaryProblem, relevantGap, solutions, relevantSignals, verifiedClaims, brief);
+
+      // 2. OPPORTUNITY COMPRESSION: Consolidate overlapping / near-duplicate candidates
+      const overlappingOpp = this.findOverlappingOpportunity(opp, opportunities);
+      if (overlappingOpp) {
+        // Merge evidence and signals into existing opportunity to enrich it
+        const oppEvidence = opp.supporting_evidence || [];
+        const existingEvidence = overlappingOpp.supporting_evidence || [];
+        const newEvidenceIds = oppEvidence.filter(id => !existingEvidence.includes(id));
+        overlappingOpp.supporting_evidence = [...existingEvidence, ...newEvidenceIds];
+        
+        if (opp.commercial_signals) {
+          overlappingOpp.commercial_signals = overlappingOpp.commercial_signals || [];
+          opp.commercial_signals.forEach(sig => {
+            if (!overlappingOpp.commercial_signals!.some(s => s.description === sig.description)) {
+              overlappingOpp.commercial_signals!.push(sig);
+            }
+          });
+        }
+
+        this.lastRejectedCandidates.push({
+          id: opp.id,
+          title: opp.title || opp.name || 'Untitled Opportunity',
+          problem: opp.problem || opp.userProblem || 'Operational friction',
+          rejectionReason: `CONSOLIDATED_VARIANT: Merged into existing opportunity "${overlappingOpp.title || overlappingOpp.name}" addressing the same core workflow.`,
+          evidenceCount: oppEvidence.length,
+          evidenceIds: oppEvidence
+        });
+        continue;
+      }
+
       opportunities.push(opp);
     }
 
-    return opportunities.sort((a, b) => {
-      const fitA = a.evaluation?.contextualFitScore ?? a.evidenceConfidence;
-      const fitB = b.evaluation?.contextualFitScore ?? b.evidenceConfidence;
-      return fitB - fitA;
-    });
+    return opportunities;
+  }
+
+  private evaluateEvidenceGate(
+    problem: ExtractedProblem,
+    signals: CommercialSignal[],
+    cluster: ProblemCluster,
+    brief?: ResearchBrief
+  ): { passed: boolean; reason: string } {
+    // 1. Problem evidence exists
+    if (!problem.evidenceIds || problem.evidenceIds.length === 0) {
+      return { passed: false, reason: 'ZERO_EVIDENCE: No authentic user evidence citations found.' };
+    }
+
+    // 2. Exclusions enforcement
+    if (brief?.constraints?.exclusions && brief.constraints.exclusions.length > 0) {
+      const fullText = `${problem.problemStatement} ${cluster.clusterName} ${problem.jobWorkflow}`.toLowerCase();
+      for (const excl of brief.constraints.exclusions) {
+        const cleanExcl = excl.toLowerCase().trim();
+        if (cleanExcl.length > 1 && fullText.includes(cleanExcl)) {
+          return { passed: false, reason: `EXCLUSION_VIOLATION: Matches user-excluded category "${excl}".` };
+        }
+      }
+    }
+
+    // 3. Filter non-pain announcement/marketing text
+    const text = `${problem.problemStatement} ${cluster.clusterName}`.toLowerCase();
+    const isAnnouncement = /hacktoberfest.*challenge|challenges.*prompt|submit your.*here|weekly.*theme/i.test(text);
+    if (isAnnouncement && problem.signalCount < 3 && signals.length === 0) {
+      return { passed: false, reason: 'NON_PAIN_SIGNAL: Signal describes a community challenge/announcement rather than verified operational drag.' };
+    }
+
+    // 4. Reject if overall evidence state is unverified and weak
+    const hasStrongSignal = signals.some(s => s.strength === 'STRONG');
+    const hasWorkaround = problem.workaroundType !== 'none';
+    
+    if (!hasWorkaround && !hasStrongSignal && problem.evidenceQuality === 'LOW' && problem.signalCount < 2) {
+      return { passed: false, reason: 'INSUFFICIENT_EVIDENCE: Isolated signal lacking workaround behavior or commercial validation.' };
+    }
+
+    return { passed: true, reason: 'Passed' };
+  }
+
+  private findOverlappingOpportunity(
+    candidate: ProductOpportunity,
+    existingList: ProductOpportunity[]
+  ): ProductOpportunity | null {
+    const candidateTokens = this.tokenize(`${candidate.title} ${candidate.workflow} ${candidate.problem}`);
+
+    for (const existing of existingList) {
+      const existingTokens = this.tokenize(`${existing.title} ${existing.workflow} ${existing.problem}`);
+
+      const intersection = candidateTokens.filter(t => existingTokens.includes(t));
+      const union = new Set([...candidateTokens, ...existingTokens]).size;
+      const jaccard = union > 0 ? intersection.length / union : 0;
+
+      // Check if they target the same user + share significant workflow tokens
+      const candidateUser = (candidate.target_user || candidate.targetCustomer || '').toLowerCase();
+      const existingUser = (existing.target_user || existing.targetCustomer || '').toLowerCase();
+      const sameTarget = candidateUser.length > 0 && candidateUser === existingUser;
+      const sharedCoreAnchor = candidateTokens.length > 0 && existingTokens.length > 0 && candidateTokens[0] === existingTokens[0];
+
+      if (jaccard >= 0.35 || (sameTarget && sharedCoreAnchor) || (sameTarget && intersection.length >= 3)) {
+        return existing;
+      }
+    }
+
+    return null;
+  }
+
+  private tokenize(text: string): string[] {
+    const stopwords = new Set([
+      'the', 'is', 'at', 'which', 'on', 'and', 'a', 'an', 'to', 'in', 'of', 'for', 'with',
+      'it', 'this', 'that', 'as', 'are', 'be', 'by', 'was', 'or', 'from', 'but', 'not',
+      'automated', 'operations', 'workflow', 'system', 'tool', 'service', 'platform'
+    ]);
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !stopwords.has(w));
   }
 
   private buildOpportunityForCluster(
     cluster: ProblemCluster,
     problem: ExtractedProblem,
     gap: MarketGap | undefined,
+    solutions: ExistingSolution[],
+    signals: CommercialSignal[],
+    verifiedClaims: VerifiedClaim[],
     brief: ResearchBrief
   ): ProductOpportunity {
-    const clusterName = cluster.clusterName.toLowerCase();
-    const { opportunityProfile, target, objective } = brief;
-    const { buildHorizon, productTypes } = opportunityProfile;
-
-    // 1. Determine dominant Opportunity Type
-    let oppType: OpportunityType = 'SaaS';
-    if (productTypes && productTypes.length > 0 && !productTypes.includes('Any')) {
-      if (objective === 'find_developer_tool_opportunities' || productTypes.includes('Developer tool')) {
-        oppType = 'Developer tool';
-      } else if (objective === 'find_automation_opportunities' || productTypes.includes('Automation')) {
-        oppType = 'Automation';
-      } else if (objective === 'find_internal_tool_opportunities' || productTypes.includes('Internal tool')) {
-        oppType = 'Internal tool';
-      } else if (objective === 'find_productized_service_opportunities' || productTypes.includes('Productized service')) {
-        oppType = 'Productized service';
-      } else if (productTypes.includes('Micro-SaaS') || buildHorizon === '7d') {
-        oppType = 'Micro-SaaS';
-      } else {
-        oppType = productTypes[0];
-      }
-    } else if (buildHorizon === '7d') {
-      oppType = 'Micro-SaaS';
-    }
-
-    // 2. Derive build timeline & complexity scaling from Build Horizon
-    let technicalComplexity: 'Low' | 'Medium' | 'High' = 'Medium';
-    let estimatedMvpBuildTime = '3–4 weeks';
-    let mvpScope: string[] = [];
-    let whatNotToBuild: string[] = [];
-
-    if (buildHorizon === '7d') {
-      technicalComplexity = 'Low';
-      estimatedMvpBuildTime = '3–7 business days';
-      mvpScope = [
-        'Single-purpose webhook receiver or CLI script automating core task',
-        'Direct notification via email, Slack, or SMS on task completion',
-        'Minimal single-page config UI without complex dashboard nesting',
-      ];
-      whatNotToBuild = [
-        'Custom multi-tenant user authentication or team roles',
-        'In-app billing portals or subscription management (use direct Stripe links)',
-        'Drag-and-drop workflow builders or visual node editors',
-        'Mobile applications or complex multi-step wizards',
-      ];
-    } else if (buildHorizon === '2-3w') {
-      technicalComplexity = 'Low';
-      estimatedMvpBuildTime = '2–3 weeks';
-      mvpScope = [
-        'Production webhook listener with retry queue and dead-letter handling',
-        'Clean, responsive dashboard to view sync logs and trigger manual reruns',
-        'One-click OAuth integration with 2 primary customer platforms',
-        'Basic email alerts for failures and daily execution summaries',
-      ];
-      whatNotToBuild = [
-        'Custom report builder with PDF/CSV chart exports',
-        'Enterprise Single Sign-On (SAML/Okta)',
-        'Granular role-based access control (RBAC)',
-      ];
-    } else if (buildHorizon === '1m') {
-      technicalComplexity = 'Medium';
-      estimatedMvpBuildTime = '3–4 weeks';
-      mvpScope = [
-        'Self-serve onboarding flow with automated credential validation',
-        'Persistent database state with real-time sync status monitoring',
-        'Stripe Checkout subscription billing and self-serve upgrade tier',
-        'Detailed audit logs and historical execution inspection view',
-      ];
-      whatNotToBuild = [
-        'Custom API SDK generation in multiple programming languages',
-        'On-premise Docker deployment appliances',
-        'White-label branding for agency resellers',
-      ];
-    } else if (buildHorizon === '3m') {
-      technicalComplexity = 'Medium';
-      estimatedMvpBuildTime = '8–12 weeks';
-      mvpScope = [
-        'Multi-seat workspace collaboration with team member invitations',
-        'Deep bidirectional integrations across top 4 enterprise platforms in domain',
-        'Customizable rule triggers, thresholds, and execution conditions',
-        'Comprehensive telemetry and operational performance metrics',
-      ];
-      whatNotToBuild = [
-        'Autonomous multi-agent orchestration beyond deterministic rules',
-        'Full custom ERP/CRM replacement functionality',
-      ];
-    } else if (buildHorizon === '6m' || buildHorizon === '12m') {
-      technicalComplexity = 'High';
-      estimatedMvpBuildTime = buildHorizon === '6m' ? '18–24 weeks' : '9–12 months';
-      mvpScope = [
-        'Enterprise-grade multi-tenant platform with SOC2 / HIPAA audit controls',
-        'Public REST/GraphQL API with rate limiting and developer documentation',
-        'Enterprise Single Sign-On (SAML, Okta, Azure AD) and SCIM provisioning',
-        'Custom workflow automation canvas and high-throughput background processing',
-      ];
-      whatNotToBuild = [
-        'Attempting to rebuild incumbent platform core capabilities from scratch',
-        'Unverified bespoke integrations requested by only a single client',
-      ];
-    }
-
-    // 3. Domain Specific Logic (Lead, Invoice, Sync, Testing, Tooling)
-    let name = `${oppType}: Automated ${cluster.clusterName}`;
-    let oneLiner = `Evidence-backed ${oppType.toLowerCase()} solving repetitive operational friction in ${problem.jobWorkflow.toLowerCase()}.`;
-    let proposedSolution = `A dedicated ${oppType.toLowerCase()} that eliminates manual workarounds by automating the handoff between existing systems.`;
-    let coreWorkflow = problem.jobWorkflow;
-    let keyDependencies = ['OAuth Integration', 'Webhook Gateway', 'State Storage'];
-    let majorRisks = ['Platform API rate limits or policy shifts', 'User inertia sticking with spreadsheets'];
-    let monetizationPossibilities = ['$49/month SMB Tier', '$149/month Team Tier'];
-    let distributionDifficulty: 'Low' | 'Medium' | 'High' = 'Medium';
-    let aiRequirements = 'Structured classification and entity extraction using lightweight prompt templates';
-    let dataRequirements = 'Stateless or minimal operational state storage with customer webhook secrets';
-    let mainTechnicalRisks = ['Handling edge case data formats and webhook timeouts'];
-    let mainBusinessRisks = ['Customer acquisition cost exceeding monthly subscription revenue'];
-
-    const targetLabel = target.targetUser || problem.targetUser || 'Operations Teams';
-
-    if (/lead|crm|sales/i.test(clusterName)) {
-      name = oppType === 'Developer tool' ? 'LeadStream SDK: Real-time Inbound Qualification' : 'LeadPulse: Instant Inbound Qualifier';
-      oneLiner = `Instantly qualifies inbound customer inquiries within 60 seconds and updates CRM records for ${targetLabel}.`;
-      proposedSolution = 'A lightweight listener capturing web form payloads, executing qualification rules, dispatching personalized follow-ups, and syncing status directly to existing team tables.';
-      coreWorkflow = 'Inquiry received → Qualification rubric executed → Follow-up dispatched → CRM updated & operator alerted';
-      keyDependencies = ['Twilio / Resend API', 'CRM Webhook Gateway'];
-      majorRisks = ['Carrier deliverability filtering', 'Competitors offering bundled features'];
-      monetizationPossibilities = ['$49/mo for up to 500 leads', '$149/mo for high-volume operators'];
-      distributionDifficulty = 'Low';
-    } else if (/invoice|billing|accounting|payment/i.test(clusterName)) {
-      name = oppType === 'Productized service' ? 'ReconcileDesk: Managed Accounts Receivable' : 'RemindFlow: Automated AR Chaser';
-      oneLiner = `Eliminates manual invoice chasing and reconciliation bottlenecks for ${targetLabel}.`;
-      proposedSolution = 'Monitors unpaid invoices approaching due dates, sends courteous escalating reminders across Email and SMS, and provides instant one-click payment links.';
-      coreWorkflow = 'Sync invoices → Evaluate payment schedule → Dispatch smart sequence → Reconcile paid status';
-      keyDependencies = ['Stripe / QuickBooks OAuth API', 'Transactional Email Gateway'];
-      majorRisks = ['Accounting platform API deprecations', 'Customer reluctance to automate financial touchpoints'];
-      monetizationPossibilities = ['$79/mo flat SMB tier', '0.5% recovery fee on overdue collections'];
-      distributionDifficulty = 'Medium';
-    } else if (/sync|sheet|spreadsheet|csv|data/i.test(clusterName)) {
-      name = oppType === 'Internal tool' ? 'Internal Ops Bridge: Automated Table Reconciler' : 'TableBridge: Two-Way System Synchronizer';
-      oneLiner = `Guarantees bidirectional data parity between spreadsheets and primary business software without manual CSV exports.`;
-      proposedSolution = 'A zero-maintenance data pipeline that detects changes in spreadsheets or database tables and mirrors updates across both environments with rollback history.';
-      coreWorkflow = 'Record edited in source → Webhook trigger fired → Schema validated → Destination updated with audit trail';
-      keyDependencies = ['Google Sheets / Excel API', 'PostgreSQL / Supabase Webhooks'];
-      majorRisks = ['Handling concurrent edits and merge conflict resolution', 'Large spreadsheet cell volume limits'];
-      monetizationPossibilities = ['$39/mo for 10 sync pairs', '$99/mo for unlimited team syncs'];
-      distributionDifficulty = 'Low';
-    } else if (/dev|test|api|code|git|debug/i.test(clusterName)) {
-      name = oppType === 'Developer tool' ? 'ContractMock: Automated API Contract Testing' : 'DevFlow: Frictionless Testing Runner';
-      oneLiner = `Catches breaking API payload changes before deployment with automated contract mock verification.`;
-      proposedSolution = 'Inspects live API traffic or OpenAPI specifications to generate resilient regression test suites and automated mock servers in CI/CD.';
-      coreWorkflow = 'OpenAPI spec imported → Mock endpoints provisioned → CI test suite executed → Breaking schema alert issued';
-      keyDependencies = ['GitHub Actions API', 'OpenAPI Schema Parser'];
-      majorRisks = ['Developer resistance to adopting new CLI tools', 'Rapidly evolving microservice topologies'];
-      monetizationPossibilities = ['Free for public repos', '$20/developer/month for private repositories'];
-      distributionDifficulty = 'Low';
-    }
-
-    const mvpProfile: MvpBuildProfile = {
-      complexity: technicalComplexity,
-      estimatedBuildTime: estimatedMvpBuildTime,
-      coreComponents: mvpScope,
-      requiredIntegrations: keyDependencies,
-      aiRequirements,
-      dataRequirements,
-      mainTechnicalRisks,
-      mainBusinessRisks,
-      validationDifficulty: technicalComplexity,
-    };
-
-    const evidenceQuotes = (problem.evidenceQuotes || []).map(q => ({
-      quote: q.quote,
-      url: q.sourceUrl,
-      platform: q.platform,
-      author: q.author,
-    }));
-
-    // Baseline object
     const oppId = `opp_${cluster.id}_${Math.random().toString(36).substring(2, 7)}`;
-    const partialOpp: ProductOpportunity = {
+    
+    const strongSignals = signals.filter(s => s.strength === 'STRONG').map(s => s.description);
+    const hasWorkaround = problem.workaroundType !== 'none';
+    
+    let uncertainty = 'Low';
+    if (!hasWorkaround && strongSignals.length === 0) {
+      uncertainty = 'High (No workaround or paid signal proven)';
+    } else if (!hasWorkaround) {
+      uncertainty = 'Medium (Commercial signal exists, but no clear workaround)';
+    } else if (strongSignals.length === 0) {
+      uncertainty = 'Medium (Workaround exists, but willingness to pay is unproven)';
+    }
+
+    const contradictingEvidence = verifiedClaims.flatMap(c => c.contradictingEvidenceIds || []);
+    if (contradictingEvidence.length > 0) {
+      uncertainty = `Contested (Contradictory evidence exists). ${uncertainty}`;
+    }
+
+    const unsupportedClaims = verifiedClaims.filter(c => c.status === 'UNSUPPORTED');
+    const hypotheses = [
+      `If we build a landing page targeting ${problem.targetUser} for this, they will join a waitlist.`,
+      `If we manually execute this workflow for them, they will pay a monthly fee.`
+    ];
+    // Map unsupported claims into hypotheses
+    unsupportedClaims.forEach(c => hypotheses.push(`Hypothesis: ${c.claimText}`));
+
+    const researchedSolutions = solutions.filter(s => s.investigationStatus === 'RESEARCHED');
+    const solutionNames = researchedSolutions.length > 0 
+      ? researchedSolutions.map(s => s.name)
+      : ['None identified in source evidence'];
+
+    return {
       id: oppId,
-      name,
-      oneLineDescription: oneLiner,
-      targetCustomer: targetLabel,
+      title: `Automated ${cluster.clusterName}`,
+      target_user: problem.targetUser,
+      target_buyer: problem.problemOwner || problem.targetUser,
+      problem: problem.problemStatement,
+      workflow: problem.jobWorkflow,
+      trigger: problem.workflowTrigger || 'Unknown Trigger',
+      current_workaround: problem.currentWorkaround,
+      existing_solutions: solutionNames,
+      solutionInvestigationStatus: researchedSolutions.length > 0 ? 'RESEARCHED' : 'NO_RELEVANT_SOLUTION_FOUND',
+      solution_gap: gap ? gap.description : 'Missing focused automation workflow.',
+      commercial_signals: signals,
+      supporting_evidence: problem.evidenceIds,
+      counter_evidence: contradictingEvidence,
+      counterEvidenceIds: contradictingEvidence,
+      counterEvidenceStatus: 'COUNTER_EVIDENCE_NOT_PERFORMED',
+      constraints_fit: `Fits ${brief.opportunityProfile?.teamSize || 'solo'} build horizon (${brief.opportunityProfile?.buildHorizon || 'standard'}).`,
+      assumptions: [
+        `Target users (${problem.targetUser}) are open to adopting software over ${problem.currentWorkaround || 'current practices'}.`,
+        strongSignals.length > 0 ? 'Observed spending signals indicate viable willingness to pay.' : 'Commercial willingness to pay requires formal verification.'
+      ],
+      uncertainty,
+      potential_solution: `A dedicated tool replacing the ${problem.workaroundType} workaround with a one-click automated integration.`,
+      validation_hypotheses: hypotheses,
+      verified_claims: verifiedClaims,
+      recommended_next_action: strongSignals.length > 0 ? 'Proceed to validation' : 'Conduct deeper commercial investigation',
+      
+      // Legacy fields
+      name: `Automated ${cluster.clusterName}`,
+      oneLineDescription: `Fixing ${problem.problemStatement} for ${problem.targetUser}`,
+      targetCustomer: problem.targetUser,
       userProblem: problem.problemStatement,
-      evidenceSummary: `${problem.signalCount} direct user complaint(s) corroborated across ${cluster.sourceDiversity} distinct source platform(s).`,
-      evidenceQuotes,
-      existingAlternatives: problem.currentWorkaround || 'Manual operator intervention and spreadsheets',
-      gap: gap ? gap.description : 'Incumbent platforms lack focused automation for this specific workflow step.',
-      proposedSolution,
-      coreWorkflow,
-      whyUseful: `Replaces ${problem.whyPainful.toLowerCase()} with a predictable automated outcome, saving hours of manual toil.`,
-      mvpScope,
-      whatNotToBuildInitially: whatNotToBuild,
-      technicalComplexity,
-      estimatedMvpBuildTime,
-      keyDependencies,
-      majorRisks,
-      monetizationPossibilities,
-      distributionDifficulty,
-      validationExperiment: {
-        hypothesis: '',
-        test: '',
-        targetUsers: '',
-        successSignal: '',
-        invalidationSignal: '',
-      },
+      evidenceSummary: `Based on ${problem.signalCount} direct user complaints.`,
+      evidenceQuotes: problem.evidenceQuotes.length > 0
+        ? problem.evidenceQuotes.map(q => ({ quote: q.quote, url: q.sourceUrl, platform: q.platform, author: q.author }))
+        : problem.evidenceIds.map(id => ({
+            quote: problem.painPoint || problem.problemStatement,
+            url: 'evidence://' + id,
+            platform: 'web' as const
+          })),
+      existingAlternatives: problem.currentWorkaround,
+      gap: gap ? gap.description : '',
+      proposedSolution: 'A dedicated automation tool.',
+      coreWorkflow: problem.jobWorkflow,
+      whyUseful: problem.whyPainful,
+      mvpScope: ['Core automation logic'],
+      whatNotToBuildInitially: ['Enterprise SSO'],
+      technicalComplexity: 'Medium',
+      estimatedMvpBuildTime: '3-4 weeks',
+      keyDependencies: ['APIs'],
+      majorRisks: ['Distribution'],
+      monetizationPossibilities: ['$49/mo'],
+      distributionDifficulty: 'Medium',
+      validationExperiment: { hypothesis: '', test: '', targetUsers: '', successSignal: '', invalidationSignal: '' },
       evidenceConfidence: problem.confidence,
-      opportunityType: oppType,
-      clusterId: cluster.id,
-      mvpProfile,
     };
-
-    // 4. Run Context-Adaptive Evaluation
-    const evaluation = this.evaluator.evaluate(partialOpp, brief);
-    partialOpp.evaluation = evaluation;
-
-    // 5. Generate Context-Adaptive Validation Experiment
-    partialOpp.validationExperiment = this.validationEngine.generateExperiment(partialOpp, brief, evaluation);
-
-    return partialOpp;
   }
 }

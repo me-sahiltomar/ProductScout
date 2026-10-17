@@ -82,159 +82,179 @@ export class ReportGenerator {
   public generateMarkdownReport(run: ResearchRun): string {
     const brief = run.brief || normalizeBrief(run.config);
     const outputType = run.adaptiveOutputType || resolveAdaptiveOutputType(brief);
-    const { coverage, problems, clusters, existingSolutions, gaps, opportunities, weakSignals, classifiedEvidence } = run;
+    const { coverage, problems, clusters, existingSolutions, gaps, opportunities, weakSignals, classifiedEvidence, telemetry } = run;
 
     const lines: string[] = [];
 
-    lines.push(`# ProductScout: General Opportunity Intelligence Report`);
-    lines.push(`**Tagline**: *Discovers real problems and identifies software products worth building.*`);
-    lines.push(``);
-    lines.push(`- **Research Subject**: "${brief.subject}"`);
-    lines.push(`- **Objective**: \`${brief.objective}\``);
-    lines.push(`- **Build Horizon**: **${brief.opportunityProfile.buildHorizon}** | **Evidence Window**: ${brief.researchConfiguration.evidenceWindow}`);
-    lines.push(`- **Target Profile**: ${brief.target.primaryUser || run.config.targetUser || 'Operators'} (${brief.target.targetCompany || 'SMB/Mid-Market'}, ${brief.target.industry || 'Technology & Services'})`);
-    lines.push(`- **Adaptive Output Document**: \`${this.getOutputDocumentTitle(outputType)}\``);
-    lines.push(`- **Date Generated**: ${new Date(run.createdAt).toLocaleString()}`);
-    lines.push(``);
-    lines.push(`---`);
+    lines.push(`# ProductScout: Deep Research Report`);
+    lines.push(`**Research Subject**: "${brief.subject}"`);
+    lines.push(`**Target Profile**: ${brief.target.primaryUser || run.config.targetUser || 'Operators'} (${brief.target.industry || 'Technology'})`);
+    lines.push(`**Date Generated**: ${new Date(run.createdAt).toLocaleString()}`);
     lines.push(``);
 
-    // 1. Executive Summary
-    lines.push(`## 1. Executive Summary`);
-    lines.push(`ProductScout investigated authentic practitioner signals across public developer and operator communities to uncover verified problems and software opportunities in **"${brief.subject}"**.`);
-    lines.push(`- **Evaluated Signals**: ${coverage.sourcesCollectedCount} raw posts & discussions across ${coverage.sourcesSucceeded.length} active platforms.`);
-    lines.push(`- **Verified Core Problems**: ${problems.length} distinct recurring friction points.`);
-    lines.push(`- **Workflow Clusters**: ${clusters.length} functional clusters identified.`);
-    lines.push(`- **Identified Gaps**: ${gaps.length} market & operational gaps documented.`);
-    lines.push(`- **Formulated Opportunities**: ${opportunities.length} opportunities evaluated against user constraints & resource profile.`);
-    lines.push(`- **Weak / Unverified Signals**: ${weakSignals.length} routed to observation.`);
-    lines.push(``);
-
-    // 2. Adaptive Execution Document
-    lines.push(`---`);
-    lines.push(``);
-    lines.push(`## 2. Adaptive Execution Document: ${this.getOutputDocumentTitle(outputType)}`);
-    lines.push(this.generateAdaptiveBrief(run, outputType));
-    lines.push(``);
-    lines.push(`---`);
-    lines.push(``);
-
-    // 3. Research Coverage & Evidence Quality
-    lines.push(`## 3. Research Coverage & Signal Authenticity`);
-    lines.push(`- **Platforms Searched**: ${coverage.sourcesSearched.join(', ') || 'Reddit, Hacker News, GitHub, Dev.to, Web'}`);
-    lines.push(`- **Active Ingestion Sources**: ${coverage.sourcesSucceeded.join(', ')}`);
-    if (coverage.sourcesUnavailable.length > 0) {
-      lines.push(`- **Unavailable / Limited Sources**:`);
-      coverage.sourcesUnavailable.forEach(u => lines.push(`  - *${u.platform}*: ${u.reason}`));
-    }
-    lines.push(`- **Evidence Quality Breakdown**:`);
-    lines.push(`  - **High Quality** (Direct first-hand operator complaints): ${coverage.qualityDistribution.high}`);
-    lines.push(`  - **Medium Quality** (Community discussions & inquiries): ${coverage.qualityDistribution.medium}`);
-    lines.push(`  - **Low / Penalized** (Generic or vendor marketing): ${coverage.qualityDistribution.low}`);
-    lines.push(``);
-
-    // 4. Evidence Landscape
-    lines.push(`## 4. Key Representative User Evidence`);
-    classifiedEvidence.slice(0, 5).forEach((ev) => {
-      lines.push(`> "${ev.painQuote || ev.snippet}"`);
-      lines.push(`> — **${ev.author || 'Practitioner'}** on [${ev.platform.toUpperCase()}: ${ev.title}](${ev.url}) *(Quality: ${ev.quality}, Confidence: ${ev.qualityScore}/100)*`);
+    // 1. Terminal State & Research Summary
+    lines.push(`## 1. Research Telemetry & Outcome`);
+    lines.push(`- **Terminal State**: \`${run.status}\``);
+    
+    if (telemetry) {
       lines.push(``);
-    });
-
-    // 5. Problems & Workflows
-    lines.push(`## 5. Top Verified Recurring Problems`);
-    problems.forEach((p, idx) => {
-      lines.push(`### Problem ${idx + 1}: ${p.problemStatement}`);
-      lines.push(`- **Target User**: ${p.targetUser}`);
-      lines.push(`- **Workflow Context**: ${p.jobWorkflow}`);
-      lines.push(`- **Why Painful**: ${p.whyPainful}`);
-      lines.push(`- **Current Workaround**: ${p.currentWorkaround}`);
-      lines.push(`- **Recurrence Frequency**: ${p.frequency}`);
-      lines.push(`- **Signal Multiplicity**: ${p.signalCount} independent sources (Confidence: ${p.confidence}%)`);
-      lines.push(`- **Direct User Evidence Quotes**:`);
-      p.evidenceQuotes.forEach(q => {
-        lines.push(`  - *"${q.quote}"* — [${q.platform.toUpperCase()}](${q.sourceUrl})`);
+      lines.push(`### Research Execution`);
+      lines.push(`- **Discovery Searches**: ${telemetry.discoverySearches ?? telemetry.searches}`);
+      lines.push(`- **Candidate Results**: ${telemetry.candidateResults ?? telemetry.evidenceItems}`);
+      lines.push(`- **Selective Deep Fetches**: ${telemetry.deepFetches}`);
+      lines.push(`- **Sources Evaluated**: ${telemetry.sourcesEvaluated}`);
+      
+      const roundedRuntime = Math.round((telemetry.runtimeMs / 1000));
+      lines.push(`- **Runtime**: approximately ${roundedRuntime}s`);
+      
+      const costCents = Math.round(telemetry.estimatedCostUsd * 100);
+      lines.push(`- **Estimated Cost**: ~${costCents}¢`);
+      
+      lines.push(``);
+      lines.push(`### Research Quality`);
+      lines.push(`- **Evidence Items Extracted**: ${telemetry.evidenceItems}`);
+      lines.push(`- **Counter-Evidence Rounds**: ${telemetry.counterEvidenceRounds > 0 ? `${telemetry.counterEvidenceRounds} confirmed challenging round(s)` : 'None detected in search'}`);
+      
+      let verifiedCount = 0;
+      let contestedCount = 0;
+      run.verifiedClaims?.forEach(c => {
+        if (c.status === 'VERIFIED') verifiedCount++;
+        if (c.status === 'CONTESTED') contestedCount++;
       });
-      lines.push(``);
-    });
-
-    // 6. Problem Clusters
-    lines.push(`## 6. Functional Problem Clusters`);
-    clusters.forEach(c => {
-      lines.push(`### Cluster: ${c.clusterName}`);
-      lines.push(`- **Included Problems**: ${c.problemIds.length} sub-problems`);
-      lines.push(`- **Signal Diversity**: ${c.signalCount} signals across ${c.sourceDiversity} platforms`);
-      lines.push(`- **Affected Segment**: ${c.commonAffectedUsers}`);
-      lines.push(`- **Common Workflow**: ${c.commonWorkflow}`);
-      lines.push(`- **Overall Evidence Strength**: **${c.overallEvidenceStrength}**`);
-      lines.push(``);
-    });
-
-    // 7. Existing Solutions & Workarounds
-    lines.push(`## 7. Incumbent Solutions & Workarounds`);
-    existingSolutions.forEach(sol => {
-      lines.push(`### ${sol.name} (${sol.type.replace('_', ' ').toUpperCase()})`);
-      lines.push(`- **What Users Currently Do**: ${sol.whatUsersDo}`);
-      lines.push(`- **Praised Features**: ${sol.positiveAspects.join(', ') || 'Basic utility'}`);
-      lines.push(`- **Reported Friction Points**: ${sol.complaints.join('; ')}`);
-      lines.push(`- **Missing Functionality**: ${sol.missingFunctionality.join('; ')}`);
-      if (sol.pricingInfo) lines.push(`- **Pricing Context**: ${sol.pricingInfo}`);
-      lines.push(`- **Underserved Segments**: ${sol.unservedSegments}`);
-      lines.push(``);
-    });
-
-    // 8. Market Gaps
-    lines.push(`## 8. Evidence-Backed Market Gaps`);
-    gaps.forEach((gap, idx) => {
-      lines.push(`### Gap ${idx + 1}: ${gap.title}`);
-      lines.push(`- **Gap Type**: \`${gap.gapType}\``);
-      lines.push(`- **Classification**: ${gap.isAiInference ? '⚠️ **[AI Inference / Market Observation]**' : '✅ **[Direct Evidence-Backed]**'}`);
-      lines.push(`- **Description**: ${gap.description}`);
-      if (gap.supportingQuotes.length > 0) {
-        lines.push(`- **Supporting Practitioner Quotes**:`);
-        gap.supportingQuotes.forEach(q => lines.push(`  - *"${q}"*`));
+      if (run.verifiedClaims && run.verifiedClaims.length > 0) {
+        lines.push(`- **Verified Claims**: ${verifiedCount}`);
+        lines.push(`- **Contested Claims**: ${contestedCount}`);
       }
-      lines.push(``);
-    });
+    }
 
-    // 9. Formulated Opportunities & Contextual Fit
-    lines.push(`## 9. Formulated Product Opportunities`);
-    opportunities.forEach((opp, idx) => {
-      const evalData = opp.evaluation;
-      lines.push(`### Opportunity ${idx + 1}: ${opp.name} [Type: ${opp.opportunityType}]`);
-      lines.push(`*${opp.oneLineDescription}*`);
+    if (run.status === 'NO_RELEVANT_EVIDENCE_FOUND' || run.status === 'SOURCE_LIMITED') {
       lines.push(``);
-      if (evalData) {
-        lines.push(`**Contextual Fit Score**: **${evalData.contextualFitScore}/100** | **Recommended Action**: \`${evalData.recommendedAction}\``);
-        lines.push(`- **Feasibility Fit**: ${evalData.feasibilityFit.score}/100 — ${evalData.feasibilityFit.rationale}`);
-        lines.push(`- **Strategic Fit**: ${evalData.strategicFit.score}/100 — ${evalData.strategicFit.rationale}`);
-        lines.push(`- **Commercial Viability**: ${evalData.commercialViability.score}/100 (Est. Price: ${evalData.commercialViability.estimatedPricePoint}, Cycle: ${evalData.commercialViability.salesCycle})`);
-        lines.push(`- **Critical Uncertainties**: ${evalData.criticalUncertainties.join('; ') || 'None flagged'}`);
+      lines.push(`> [!WARNING]`);
+      lines.push(`> **Source Coverage Limitation**: Active collectors returned zero relevant practitioner discussions for this specific domain. This indicates source coverage limitations rather than an absence of market opportunity. We recommend configuring external search providers (e.g. Tavily) or broadening search parameters.`);
+      return lines.join('\n');
+    }
+
+    if (run.status === 'RESEARCH_BLOCKED') {
+      lines.push(``);
+      lines.push(`> [!CAUTION]`);
+      lines.push(`> **Research Blocked**: This investigation was halted because data integrity invariants were violated. ProductScout refused to fabricate unverified research conclusions.`);
+      return lines.join('\n');
+    }
+
+    if (run.status !== 'RESEARCH_COMPLETE') {
+      lines.push(``);
+      lines.push(`> [!WARNING]`);
+      lines.push(`> Research halted before completion due to \`${run.status}\`.`);
+    }
+    
+    if (run.status === 'NO_MATERIAL_OPPORTUNITY_FOUND' || run.status === 'INSUFFICIENT_EVIDENCE') {
+      lines.push(``);
+      lines.push(`**Conclusion:** The investigation did not find sufficient evidence of a material, unaddressed problem with a feasible workaround or commercial intent. We recommend closing this investigation or pivoting to a different subject.`);
+      return lines.join('\n');
+    }
+
+    lines.push(``);
+    lines.push(`---`);
+    lines.push(``);
+
+    // 2. Formulated Product Opportunities
+    lines.push(`## 2. Formulated Product Opportunities`);
+    lines.push(``);
+
+    opportunities.forEach((opp, idx) => {
+      lines.push(`### Opportunity ${idx + 1}: ${opp.title || opp.name}`);
+      lines.push(`**Target User**: ${opp.target_user || opp.targetCustomer} (Buyer: ${opp.target_buyer || opp.targetCustomer})`);
+      lines.push(`**Problem**: ${opp.problem || opp.userProblem}`);
+      lines.push(`**Workflow**: ${opp.workflow || opp.coreWorkflow}`);
+      lines.push(`**Trigger**: ${opp.trigger || 'Unknown'}`);
+      lines.push(`**Current Workaround**: ${opp.current_workaround || opp.existingAlternatives}`);
+      
+      const solList = opp.existing_solutions && opp.existing_solutions.length > 0 && !opp.existing_solutions.includes('None identified in source evidence')
+        ? opp.existing_solutions.join(', ')
+        : 'Existing solution analysis: None identified in source evidence.';
+      lines.push(`**Incumbents**: ${solList}`);
+      lines.push(`**Solution Gap**: ${opp.solution_gap || opp.gap}`);
+      lines.push(`**Proposed Solution**: ${opp.potential_solution || opp.proposedSolution}`);
+      lines.push(``);
+
+      // Commercial Signals
+      if (opp.commercial_signals && opp.commercial_signals.length > 0) {
+        lines.push(`#### Commercial Signals`);
+        opp.commercial_signals.forEach(sig => {
+          lines.push(`- [${sig.strength}] ${sig.description}`);
+        });
         lines.push(``);
       }
-      lines.push(`- **Target Customer**: ${opp.targetCustomer}`);
-      lines.push(`- **Problem Addressed**: ${opp.userProblem}`);
-      lines.push(`- **Proposed Solution**: ${opp.proposedSolution}`);
-      lines.push(`- **Core Workflow**: ${opp.coreWorkflow}`);
-      lines.push(`- **Technical Complexity**: ${opp.technicalComplexity} | **Est. Build Time**: ${opp.estimatedMvpBuildTime}`);
-      lines.push(`- **Monetization**: ${opp.monetizationPossibilities.join(', ')}`);
-      lines.push(`- **Evidence Confidence**: **${opp.evidenceConfidence}%**`);
+
+      // Counter-Evidence Status
+      if (opp.counterEvidenceStatus === 'COUNTER_EVIDENCE_PERFORMED' && opp.counter_evidence && opp.counter_evidence.length > 0) {
+        lines.push(`**Counter-Evidence**: Investigated (${opp.counter_evidence.length} disconfirming practitioner signal(s) cited)`);
+      } else if (opp.counterEvidenceStatus === 'NO_COUNTER_EVIDENCE_FOUND') {
+        lines.push(`**Counter-Evidence**: Evaluated (No disconfirming signals found in searched sources)`);
+      } else {
+        lines.push(`**Counter-Evidence**: Not performed / unverified`);
+      }
+      lines.push(``);
+
+      // Provenance & Claims
+      lines.push(`#### Provenance & Claims`);
+      if (opp.verified_claims && opp.verified_claims.length > 0) {
+        opp.verified_claims.forEach(claim => {
+          lines.push(`- **Claim**: ${claim.claimText}`);
+          lines.push(`  - **Status**: \`${claim.status}\`${claim.uncertaintyExplanation ? ` (${claim.uncertaintyExplanation})` : ''}`);
+          
+          if (claim.supportingEvidenceIds.length > 0) {
+            const urls = claim.supportingEvidenceIds.map(id => {
+              const e = classifiedEvidence.find(x => x.id === id);
+              return e ? `[${e.platform}](${e.url})` : `[src]`;
+            }).join(', ');
+            lines.push(`  - **Supporting**: ${urls}`);
+          }
+          if (claim.contradictingEvidenceIds.length > 0) {
+            const urls = claim.contradictingEvidenceIds.map(id => {
+              const e = classifiedEvidence.find(x => x.id === id);
+              return e ? `[${e.platform}](${e.url})` : `[src]`;
+            }).join(', ');
+            lines.push(`  - **Contradicting**: ${urls}`);
+          }
+        });
+      } else {
+        lines.push(`*No explicit claims verified for this opportunity.*`);
+      }
+      lines.push(``);
+
+      // Survival & Evidence State
+      lines.push(`#### Why this opportunity survived research`);
+      lines.push(`**Constraints & Fit**: ${opp.constraints_fit || 'Fits general parameters.'}`);
+      lines.push(`**Uncertainty / Risks**: ${opp.uncertainty || 'Unknown'}`);
+      
+      lines.push(`**Assumptions / Hypotheses**:`);
+      const hypos = opp.validation_hypotheses || [];
+      if (hypos.length > 0) {
+        hypos.forEach(h => lines.push(`- ${h}`));
+      } else {
+        lines.push(`- None explicitly logged.`);
+      }
+      lines.push(``);
+
+      lines.push(`**Recommended Next Action**: \`${opp.recommended_next_action || 'Validate First'}\``);
+      lines.push(`---`);
       lines.push(``);
     });
 
-    // 10. Insufficient Evidence / Weak Signals
-    lines.push(`## 10. Weak Signals & Unverified Trends`);
-    if (weakSignals.length === 0) {
-      lines.push(`All discovered signals met verification thresholds.`);
-    } else {
-      weakSignals.forEach(ws => {
-        lines.push(`- **${ws.title}** ([${ws.platform}](${ws.sourceUrl}))`);
-        lines.push(`  - User Statement: *"${ws.userStatement}"*`);
-        lines.push(`  - Why Insufficient: ${ws.whyInsufficient}`);
-        lines.push(`  - Potential Value: ${ws.potentialValue}`);
+    // 3. Consolidated & Filtered Candidates (Internally preserved with reasons)
+    if (run.rejectedCandidates && run.rejectedCandidates.length > 0) {
+      lines.push(`## 3. Filtered & Consolidated Candidates (${run.rejectedCandidates.length})`);
+      lines.push(`The engine evaluated the following preliminary candidates but consolidated or rejected them based on evidence criteria:`);
+      lines.push(``);
+      run.rejectedCandidates.forEach((rej, idx) => {
+        lines.push(`- **Candidate ${idx + 1}**: "${rej.title}"`);
+        lines.push(`  - **Identified Friction**: ${rej.problem}`);
+        lines.push(`  - **Decision / Reason**: \`${rej.rejectionReason}\``);
+        lines.push(`  - **Associated Evidence Count**: ${rej.evidenceCount}`);
       });
+      lines.push(``);
     }
-    lines.push(``);
 
     return lines.join('\n');
   }
@@ -287,11 +307,11 @@ ${opp.whatNotToBuildInitially.map(s => `- [ ] ⛔ ${s}`).join('\n')}
 ### Rapid MVP Brief (2–3 Weeks): ${opp.name}
 **Target Segment**: ${opp.targetCustomer}  
 **Core Problem**: ${opp.userProblem}  
-**Architecture Profile**: ${opp.technicalComplexity} complexity | ${opp.mvpProfile.aiRequirements}
+**Architecture Profile**: ${opp.technicalComplexity} complexity | ${opp.mvpProfile?.aiRequirements || 'Standard CRUD'}
 
 #### 1. Architecture & Core Integrations
 - **Core Engine**: Next.js App Router + TypeScript + Supabase
-- **Required Integrations**: ${opp.mvpProfile.requiredIntegrations.join(', ') || 'Stripe Checkout, Webhook Listeners'}
+- **Required Integrations**: ${opp.mvpProfile?.requiredIntegrations?.join(', ') || 'Stripe Checkout, Webhook Listeners'}
 - **Data Persistence**: Single-tenant data isolation with RLS
 
 #### 2. Phased 3-Week Delivery Roadmap

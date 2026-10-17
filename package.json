@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "next lint",
+    "type-check": "tsc --noEmit",
     "test": "npx tsx test/v2_architecture_matrix.ts && npx tsx test/gemini_discovery_test.ts",
     "test:e2e": "node test/e2e_security_verification.mjs",
-    "test:auth": "node test/auth_productscout_verification.mjs"
+    "test:auth": "node test/auth_productscout_verification.mjs",
+    "benchmark": "npx tsx test/benchmark/runner.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

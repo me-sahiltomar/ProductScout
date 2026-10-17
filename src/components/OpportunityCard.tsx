@@ -27,7 +27,7 @@ export const OpportunityCard: React.FC<OpportunityCardProps> = ({
 
   return (
     <div 
-      className="glass-card rounded-xl p-5 flex flex-col justify-between group cursor-pointer border border-zinc-800 hover:border-zinc-700 transition-all bg-zinc-950" 
+      className="glass-card rounded-xl p-5 flex flex-col justify-between group cursor-pointer border border-zinc-800 hover:border-zinc-700 transition-all bg-zinc-950 h-full" 
       onClick={() => onOpen(opportunity)}
     >
       <div>

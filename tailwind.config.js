@@ -32,6 +32,11 @@ module.exports = {
         'fade-in': 'fadeIn 0.25s ease-out',
         'subtle-pulse': 'subtlePulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
+      maxWidth: {
+        '8xl': '88rem',
+        '9xl': '96rem',
+        'wide': '102.5rem',
+      },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0', transform: 'translateY(4px)' },

@@ -91,6 +91,7 @@ export type CompanySize =
 export interface TargetDefinition {
   primaryUser?: string;
   targetUser?: string;
+  targetBuyer?: string;
   targetCompany?: TargetCompanyType;
   companySize?: CompanySize;
   industry?: string;
@@ -266,6 +267,15 @@ export interface ResearchBrief {
   };
 }
 
+export interface ResearchBudget {
+  maxSearches: number;
+  maxDeepFetches: number;
+  maxLlmCalls: number;
+  maxTokens: number;
+  maxCostUsd: number;
+  maxRuntimeMs: number;
+}
+
 // Backward-compatible config bridge
 export interface ResearchRunConfig {
   topic: string;
@@ -277,6 +287,7 @@ export interface ResearchRunConfig {
   industry?: string;
   enabledSources?: SourcePlatform[];
   brief?: ResearchBrief; // V2.0 Full Structured Research Brief
+  budget?: ResearchBudget; // V1.5 Deep Research Resource Controls
 }
 
 // ----------------------------------------------------------------------------
@@ -308,6 +319,8 @@ export interface ClassifiedEvidence {
   qualityScore: number; // 0 - 100
   firstHandMarkers: string[];
   painQuote?: string;
+  relevance?: 'RELEVANT' | 'PARTIALLY_RELEVANT' | 'IRRELEVANT' | 'UNCERTAIN';
+  relevanceScore?: number;
 }
 
 export interface ExtractedProblem {
@@ -320,6 +333,15 @@ export interface ExtractedProblem {
   whyPainful: string;
   currentWorkaround: string; // Crucial evidence
   frequency: string;
+  
+  // PHASE 3 STRICT FIELDS
+  workflowTrigger?: string;
+  workflowFrequency?: string;
+  manualEffortLocations?: string[];
+  costInTimeOrMoney?: string;
+  problemOwner?: string;
+  workaroundType?: 'spreadsheet' | 'zapier' | 'manual' | 'internal_tool' | 'outsourcing' | 'none';
+
   evidenceQuotes: Array<{
     quote: string;
     sourceUrl: string;
@@ -347,8 +369,11 @@ export interface ProblemCluster {
 }
 
 export interface ExistingSolution {
+  id?: string;
   name: string;
-  type: 'software_product' | 'competitor' | 'manual_workaround' | 'spreadsheets' | 'existing_tool';
+  targetUser?: string;
+  evidenceIds?: string[];
+  type: 'software_product' | 'competitor' | 'manual_workaround' | 'spreadsheets' | 'existing_tool' | 'incumbent' | 'substitute' | 'open_source';
   whatUsersDo: string;
   positiveAspects: string[];
   complaints: string[];
@@ -357,6 +382,12 @@ export interface ExistingSolution {
   integrationLimitations: string[];
   complexityFriction: string;
   unservedSegments: string;
+  
+  // PHASE 3 STRICT FIELDS
+  switchingCosts?: string;
+  integrationBurden?: string;
+  adoptionSignals?: string;
+  investigationStatus?: 'RESEARCHED' | 'NOT_INVESTIGATED' | 'NO_RELEVANT_SOLUTION_FOUND';
 }
 
 export type GapType =
@@ -446,6 +477,26 @@ export interface OpportunityEvaluation {
 // ----------------------------------------------------------------------------
 // 9. Full Product Opportunity Contract (Section 9 & 17)
 // ----------------------------------------------------------------------------
+export type ClaimStatus = 'VERIFIED' | 'PARTIALLY_SUPPORTED' | 'CONTESTED' | 'UNSUPPORTED' | 'UNVERIFIED' | 'HYPOTHESIS';
+
+export interface VerifiedClaim {
+  id: string;
+  claimText: string;
+  supportingEvidenceIds: string[];
+  contradictingEvidenceIds: string[];
+  status: ClaimStatus;
+  uncertaintyExplanation?: string;
+}
+
+export type CommercialSignalStrength = 'STRONG' | 'WEAK';
+
+export interface CommercialSignal {
+  id: string;
+  description: string;
+  strength: CommercialSignalStrength;
+  evidenceIds: string[];
+  type: 'PAID_WORKAROUND' | 'BUDGET_LANGUAGE' | 'TIME_LOSS' | 'GENERIC_SENTIMENT' | 'TREND';
+}
 export interface ProductOpportunity {
   id: string;
   name: string;
@@ -473,13 +524,38 @@ export interface ProductOpportunity {
   monetizationPossibilities: string[];
   distributionDifficulty: 'Low' | 'Medium' | 'High';
   validationExperiment: ValidationExperiment;
-  evidenceConfidence: number;
+  evidenceConfidence: number; // 0 - 100
+  counterEvidenceIds?: string[];
+  counterEvidenceStatus?: 'COUNTER_EVIDENCE_PERFORMED' | 'NO_COUNTER_EVIDENCE_FOUND' | 'COUNTER_EVIDENCE_NOT_PERFORMED' | 'COUNTER_EVIDENCE_FAILED';
+  solutionInvestigationStatus?: 'RESEARCHED' | 'NOT_INVESTIGATED' | 'NO_RELEVANT_SOLUTION_FOUND';
+  potentialValidationExperiments?: any[];
+
+  // PHASE 3 STRICT FIELDS
+  title?: string;
+  target_user?: string;
+  target_buyer?: string;
+  problem?: string;
+  workflow?: string;
+  trigger?: string;
+  current_workaround?: string;
+  existing_solutions?: string[];
+  solution_gap?: string;
+  commercial_signals?: CommercialSignal[];
+  supporting_evidence?: string[];
+  counter_evidence?: string[];
+  constraints_fit?: string;
+  assumptions?: string[];
+  uncertainty?: string;
+  potential_solution?: string;
+  validation_hypotheses?: string[];
+  verified_claims?: VerifiedClaim[];
+  recommended_next_action?: string;
 
   // V2.0 Contextual & Adaptive Extensions
   opportunityType?: OpportunityType;
   evaluation?: OpportunityEvaluation;
   clusterId?: string;
-  mvpProfile: MvpBuildProfile;
+  mvpProfile?: MvpBuildProfile;
   isSaved?: boolean;
   notes?: string;
 }
@@ -524,13 +600,97 @@ export type AdaptiveOutputType =
   | 'validation_report'
   | 'automation_brief';
 
+export type TerminalState =
+  | 'RESEARCH_COMPLETE'
+  | 'INSUFFICIENT_EVIDENCE'
+  | 'CONFLICTING_EVIDENCE'
+  | 'SOURCE_LIMITED'
+  | 'RESEARCH_BLOCKED'
+  | 'NO_MATERIAL_OPPORTUNITY_FOUND'
+  | 'NO_RELEVANT_EVIDENCE_FOUND'
+  | 'BUDGET_EXHAUSTED';
+
+export type ResearchStage =
+  | 'INITIALIZING'
+  | 'PLANNING'
+  | 'EXECUTING_ACTION'
+  | 'ANALYZING'
+  | 'SYNTHESIZING'
+  | 'STOPPING';
+
+export type ActionType =
+  | 'DISCOVERY_SEARCH'
+  | 'DOMAIN_SEARCH'
+  | 'SOURCE_FETCH'
+  | 'EVIDENCE_EXTRACTION'
+  | 'PROBLEM_INVESTIGATION'
+  | 'WORKAROUND_INVESTIGATION'
+  | 'SOLUTION_INVESTIGATION'
+  | 'COMMERCIAL_SIGNAL_INVESTIGATION'
+  | 'SOURCE_COMPARISON'
+  | 'COUNTER_EVIDENCE_SEARCH'
+  | 'CLAIM_VERIFICATION'
+  | 'SYNTHESIS'
+  | 'STOP';
+
+export type ActionLifecycle = 'PLANNED' | 'EXECUTED' | 'SUCCEEDED' | 'FAILED' | 'NOT_PERFORMED';
+
+export interface ResearchAction {
+  type: ActionType;
+  query?: string;
+  url?: string;
+  targetId?: string; // e.g. questionId or opportunityId
+  rationale: string;
+  expectedProbability: number;
+  expectedCost: number;
+  expectedValue: number;
+  lifecycle?: ActionLifecycle;
+}
+
+export interface ResearchQuestion {
+  id: string;
+  text: string;
+  importance: 'HIGH' | 'MEDIUM' | 'LOW';
+  status: 'OPEN' | 'PARTIAL' | 'COVERED';
+  uncertaintyScore: number;
+  supportingEvidenceIds: string[];
+  contradictoryEvidenceIds: string[];
+  actionsAttempted: number;
+}
+
+export interface RejectedCandidate {
+  id: string;
+  title: string;
+  problem: string;
+  rejectionReason: string;
+  evidenceCount: number;
+  evidenceIds: string[];
+}
+
+export interface ResearchTelemetry {
+  runtimeMs: number;
+  searches: number;
+  discoverySearches?: number;
+  candidateResults?: number;
+  deepFetches: number;
+  llmCalls: number;
+  tokenUsage: number;
+  estimatedCostUsd: number;
+  sourcesEvaluated: number;
+  evidenceItems: number;
+  counterEvidenceRounds: number;
+  terminalState: TerminalState;
+  modelRouting: Record<string, number>;
+  providerUsage: Record<string, number>;
+}
+
 export interface ResearchRun {
   id: string;
   createdAt: string;
   config: ResearchRunConfig;
   brief?: ResearchBrief;
   adaptiveOutputType?: AdaptiveOutputType;
-  status: 'pending' | 'collecting' | 'analyzing' | 'completed' | 'failed';
+  status: 'pending' | 'collecting' | 'analyzing' | 'completed' | 'failed' | TerminalState;
   currentStep?: string;
   is_reference?: boolean;
   coverage: ResearchCoverage;
@@ -540,9 +700,12 @@ export interface ResearchRun {
   clusters: ProblemCluster[];
   existingSolutions: ExistingSolution[];
   gaps: MarketGap[];
+  verifiedClaims?: VerifiedClaim[];
   opportunities: ProductOpportunity[];
   weakSignals: WeakSignal[];
+  rejectedCandidates?: RejectedCandidate[];
   reportMarkdown: string;
+  telemetry?: ResearchTelemetry;
   error?: string;
 }
 

@@ -63,7 +63,7 @@ export default function AccountPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="w-full max-w-4xl mx-auto px-4 py-24 flex flex-col items-center justify-center">
+      <div className="w-full max-w-5xl mx-auto px-4 py-24 flex flex-col items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-zinc-400 mb-3" />
         <p className="text-xs text-zinc-500 font-mono">Loading your ProductScout account...</p>
       </div>
@@ -142,11 +142,11 @@ export default function AccountPage() {
 
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 animate-fade-in text-zinc-300">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 animate-fade-in text-zinc-300">
       {/* Top Breadcrumb & Return to Dashboard */}
       <div className="mb-6 flex items-center justify-between">
         <Link
-          href="/"
+          href="/app"
           className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
@@ -280,7 +280,7 @@ export default function AccountPage() {
                   value={inputName}
                   onChange={(e) => setInputName(e.target.value)}
                   placeholder="Your Name"
-                  className="w-full max-w-sm px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
+                  className="w-full max-w-md px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
                 />
               </div>
 
@@ -292,7 +292,7 @@ export default function AccountPage() {
                   type="email"
                   disabled
                   value={email}
-                  className="w-full max-w-sm px-3 py-2 rounded-lg border border-white/[0.06] bg-white/[0.01] text-xs text-zinc-500 cursor-not-allowed font-mono"
+                  className="w-full max-w-md px-3 py-2 rounded-lg border border-white/[0.06] bg-white/[0.01] text-xs text-zinc-500 cursor-not-allowed font-mono"
                 />
                 <p className="text-[11px] text-zinc-500 mt-1">
                   Managed securely via your sign-in provider.
@@ -350,7 +350,7 @@ export default function AccountPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimum 6 characters"
-                  className="w-full max-w-sm px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
+                  className="w-full max-w-md px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
                 />
               </div>
 
@@ -363,7 +363,7 @@ export default function AccountPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm new password"
-                  className="w-full max-w-sm px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
+                  className="w-full max-w-md px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-colors"
                 />
               </div>
 

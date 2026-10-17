@@ -100,7 +100,7 @@ Validation Experiment:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-xl animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden my-auto">
+      <div className="relative w-full max-w-6xl max-h-[90vh] flex flex-col rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden my-auto">
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-950 flex items-start justify-between gap-4 sticky top-0 z-20">
           <div className="min-w-0">
@@ -199,20 +199,20 @@ Validation Experiment:
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-850">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+                <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-850">
                   <div className="text-[10px] font-mono text-zinc-500 uppercase">Feasibility Fit</div>
                   <div className="text-sm font-bold text-white mt-0.5">{evalData.feasibilityFit.score}/100</div>
                   <div className="text-[11px] text-zinc-400 mt-1 leading-snug">{evalData.feasibilityFit.rationale}</div>
                 </div>
 
-                <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-850">
+                <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-850">
                   <div className="text-[10px] font-mono text-zinc-500 uppercase">Strategic Fit</div>
                   <div className="text-sm font-bold text-white mt-0.5">{evalData.strategicFit.score}/100</div>
                   <div className="text-[11px] text-zinc-400 mt-1 leading-snug">{evalData.strategicFit.rationale}</div>
                 </div>
 
-                <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-850">
+                <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-850">
                   <div className="text-[10px] font-mono text-zinc-500 uppercase">Commercial Viability</div>
                   <div className="text-sm font-bold text-white mt-0.5">{evalData.commercialViability.score}/100</div>
                   <div className="text-[11px] text-zinc-400 mt-1 leading-snug">
@@ -245,7 +245,7 @@ Validation Experiment:
               Evidence & Problem Context
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800">
                 <span className="text-[10px] font-mono text-zinc-500 uppercase block mb-1">
                   Target Customer
@@ -335,7 +335,7 @@ Validation Experiment:
               Calibrated MVP Scope ({opportunity.estimatedMvpBuildTime})
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 space-y-2">
                 <span className="text-xs font-medium text-white block">
                   Must-Have MVP Scope
@@ -366,7 +366,7 @@ Validation Experiment:
             </div>
 
             {/* Quick Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
               <div className="p-3 rounded-lg bg-zinc-900/40 border border-zinc-800">
                 <span className="text-[10px] font-mono text-zinc-500 uppercase block">Complexity</span>
                 <span className="font-medium text-zinc-200">{opportunity.technicalComplexity}</span>

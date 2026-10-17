@@ -577,7 +577,7 @@ export const NewResearchView: React.FC<NewResearchViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20 animate-fade-in text-zinc-100">
+    <div className="max-w-6xl mx-auto space-y-6 pb-20 animate-fade-in text-zinc-100">
       {/* Top Banner & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
         <div>
@@ -589,7 +589,7 @@ export const NewResearchView: React.FC<NewResearchViewProps> = ({
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1.5">
             Configure Research Brief
           </h1>
-          <p className="text-xs text-zinc-400 mt-1 max-w-2xl">
+          <p className="text-xs text-zinc-400 mt-1 max-w-3xl">
             ProductScout separates universal evidence discovery from your contextual decision parameters. Configure your objective, target, resources, and horizon below.
           </p>
         </div>
@@ -607,7 +607,7 @@ export const NewResearchView: React.FC<NewResearchViewProps> = ({
       {/* Blueprint Selector Modal */}
       {showBlueprints && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-xl max-w-5xl w-full max-h-[85vh] flex flex-col shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
               <div>
                 <h3 className="text-sm font-semibold text-white">Select a Discovery Blueprint</h3>
@@ -622,7 +622,7 @@ export const NewResearchView: React.FC<NewResearchViewProps> = ({
             </div>
 
             <div className="p-6 overflow-y-auto space-y-3 divide-y divide-zinc-900">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
                 {BLUEPRINTS.map((bp) => (
                   <div
                     key={bp.id}

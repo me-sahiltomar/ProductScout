@@ -104,7 +104,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5 pb-20 animate-fade-in">
+    <div className="max-w-5xl mx-auto space-y-5 pb-20 animate-fade-in">
       <div className="border-b border-white/[0.08] pb-4">
         <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
           Engine Settings
@@ -125,7 +125,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div
               onClick={() => setProvider('heuristic')}
               className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${

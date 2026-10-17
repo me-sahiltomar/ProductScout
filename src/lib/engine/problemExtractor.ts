@@ -39,9 +39,13 @@ export class ProblemExtractor {
       }));
 
       const fullText = bucket.map(b => `${b.title} ${b.snippet}`).join(' ');
-      const workaround = this.detectWorkaround(fullText);
+      
+      const { workaroundDesc, workaroundType } = this.detectWorkaround(fullText);
       const targetUser = this.detectTargetUser(fullText, config.targetUser);
       const workflow = this.detectWorkflow(fullText, config.topic);
+      const trigger = this.detectTrigger(fullText);
+      const frequency = this.detectFrequency(fullText);
+      const cost = this.detectCost(fullText);
 
       const avgQualityScore = bucket.reduce((sum, b) => sum + b.qualityScore, 0) / bucket.length;
       const evidenceQuality = avgQualityScore >= 68 && bucket.length >= 2 ? 'HIGH' : 'MEDIUM';
@@ -51,18 +55,22 @@ export class ProblemExtractor {
         Math.round(40 + (distinctSources.size * 12) + (platforms.size * 10) + (avgQualityScore * 0.2))
       );
 
-      const frequency = this.detectFrequency(fullText);
-
       problems.push({
         id: `prob_${problemIndex++}`,
         problemStatement: this.formulateProblemStatement(theme, primary.title, fullText),
         targetUser,
-        userContext: `Operating in ${config.topic || 'daily operations'}, dealing with high friction in repetitive tasks.`,
+        userContext: `Operating in ${config.topic || 'daily operations'}.`,
         jobWorkflow: workflow,
-        painPoint: `High operational drag, recurring manual errors, and loss of productive hours.`,
-        whyPainful: `Forces operators to shift context, introduces human data entry mistakes, and creates customer response latency.`,
-        currentWorkaround: workaround,
+        painPoint: `High operational drag and repetitive manual work.`,
+        whyPainful: `Forces operators to shift context and slows down resolution.`,
+        currentWorkaround: workaroundDesc,
+        workaroundType,
         frequency,
+        workflowTrigger: trigger,
+        workflowFrequency: frequency,
+        manualEffortLocations: ['Data entry', 'Cross-referencing'],
+        costInTimeOrMoney: cost,
+        problemOwner: targetUser,
         evidenceQuotes: quotes,
         evidenceIds: bucket.map(b => b.id),
         signalCount: distinctSources.size,
@@ -77,77 +85,41 @@ export class ProblemExtractor {
 
   private determineThemeKey(title: string, snippet: string): string {
     const text = `${title} ${snippet}`.toLowerCase();
+    const words = text.replace(/[^a-z0-9\s]/g, '').split(/\s+/);
+    const stopwords = new Set(['the', 'is', 'at', 'which', 'on', 'and', 'a', 'an', 'to', 'in', 'of', 'for', 'with', 'it', 'this', 'that', 'as', 'are', 'be', 'by', 'was', 'or', 'from', 'but', 'not', 'have', 'has', 'we', 'they', 'you', 'i', 'my', 'our', 'their', 'can', 'will', 'would', 'should', 'what', 'how', 'why', 'who', 'when', 'where', 'do', 'does', 'did', 'if', 'then', 'than', 'so', 'about', 'more', 'some', 'any', 'all', 'one', 'out', 'up', 'down', 'like', 'just', 'get', 'got', 'make', 'made', 'use', 'using', 'need', 'needs', 'want', 'wants', 'know', 'think', 'see', 'look', 'good', 'bad', 'much', 'many', 'very', 'really', 'too', 'also', 'only', 'even', 'still', 'now', 'well', 'way', 'time', 'day', 'year', 'work', 'new', 'first', 'last', 'same', 'different', 'other', 'another', 'own', 'such', 'these', 'those', 'there', 'here', 'being', 'been', 'doing', 'done', 'having', 'had', 'could', 'might', 'must']);
+    
+    const filtered = words.filter(w => w.length > 3 && !stopwords.has(w));
+    if (filtered.length === 0) return 'general_friction';
 
-    if (/\b(lead|crm|prospect|outreach|sales|follow-up|follow up)\b/i.test(text)) {
-      return 'manual_lead_crm_sync';
-    }
-    if (/\b(invoice|billing|payment|stripe|bookkeeping|accounting|expense|receipt)\b/i.test(text)) {
-      return 'invoicing_and_reconciliation';
-    }
-    if (/\b(customer service|support ticket|inquiry|inbox|email triage|zendesk|intercom)\b/i.test(text)) {
-      return 'customer_inquiry_overload';
-    }
-    if (/\b(inventory|stock|supplier|order fulfillment|warehouse|shipping|tracking)\b/i.test(text)) {
-      return 'inventory_and_order_dispatch';
-    }
-    if (/\b(calendar|scheduling|booking|appointment|rescheduling|no-show)\b/i.test(text)) {
-      return 'appointment_scheduling_friction';
-    }
-    if (/\b(social media|content creation|posting|marketing copy|campaign)\b/i.test(text)) {
-      return 'marketing_content_distribution';
-    }
-    if (/\b(document|pdf|contract|extraction|data entry|ocr|scanning)\b/i.test(text)) {
-      return 'document_data_entry_and_parsing';
-    }
-    if (/\b(onboarding|client setup|client intake|forms|verification)\b/i.test(text)) {
-      return 'client_intake_and_onboarding';
-    }
-    if (/\b(reporting|dashboard|analytics|aggregat|metrics|spreadsheet)\b/i.test(text)) {
-      return 'fragmented_metrics_reporting';
-    }
-    if (/\b(automation|zapier|make|integromat|webhook|api broken|sync)\b/i.test(text)) {
-      return 'brittle_workflow_integrations';
-    }
-
-    const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 4);
-    return words.slice(0, 2).join('_') || 'general_operational_friction';
+    return filtered.slice(0, 2).join('_');
   }
 
   private formulateProblemStatement(theme: string, title: string, text: string): string {
-    const themeTitles: Record<string, string> = {
-      manual_lead_crm_sync: 'Manual data entry and delay synchronizing inbound leads into CRM and follow-up sequences',
-      invoicing_and_reconciliation: 'Time-consuming manual invoice cross-referencing and late payment reconciliation',
-      customer_inquiry_overload: 'Repetitive front-line customer questions overwhelming operational staff with slow turnaround times',
-      inventory_and_order_dispatch: 'Disjointed stock synchronization causing stockouts and manual order dispatch delays',
-      appointment_scheduling_friction: 'Back-and-forth communication friction causing appointment no-shows and lost client bookings',
-      marketing_content_distribution: 'Multi-channel content repurposing and scheduling bottleneck consuming founder hours',
-      document_data_entry_and_parsing: 'Manual transcription of unstructured invoices, PDFs, and intake documents into operational systems',
-      client_intake_and_onboarding: 'Fragmented customer onboarding checklists requiring repeated manual nudges and delays',
-      fragmented_metrics_reporting: 'Scattered operational and revenue metrics locked in siloed tools requiring manual weekly spreadsheets',
-      brittle_workflow_integrations: 'Brittle custom automations and API connectors silently failing without user-friendly observability',
-    };
-
-    if (themeTitles[theme]) {
-      return themeTitles[theme];
+    const cleanTitle = title.replace(/^(how to|why is|anyone else|help with|looking for|struggling with)\s+/i, '');
+    if (cleanTitle.length > 15) {
+      return cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1).slice(0, 110);
     }
-
-    return title.replace(/^(how to|why is|anyone else|help with)\s+/i, '').slice(0, 110);
+    const words = theme.split('_');
+    return `Operational friction regarding ${words.join(' ')}`;
   }
 
-  private detectWorkaround(text: string): string {
+  private detectWorkaround(text: string): { workaroundDesc: string, workaroundType: 'spreadsheet' | 'zapier' | 'manual' | 'internal_tool' | 'outsourcing' | 'none' } {
     if (/\b(google sheets|spreadsheet|excel|csv)\b/i.test(text)) {
-      return 'Maintaining complex Google Sheets/Excel spreadsheets with manual copy-pasting';
+      return { workaroundDesc: 'Google Sheets / Excel with copy-pasting', workaroundType: 'spreadsheet' };
     }
     if (/\b(zapier|make\.com|integromat)\b/i.test(text)) {
-      return 'Cobbling together fragile multi-step Zapier/Make automations that frequently break';
+      return { workaroundDesc: 'Multi-step Zapier/Make automations', workaroundType: 'zapier' };
     }
-    if (/\b(virtual assistant|va|hire|contractor|intern)\b/i.test(text)) {
-      return 'Hiring part-time virtual assistants or contractors to manually perform data entry';
+    if (/\b(virtual assistant|va|hire|contractor|intern|agency)\b/i.test(text)) {
+      return { workaroundDesc: 'Hiring contractors/VAs to manually perform tasks', workaroundType: 'outsourcing' };
+    }
+    if (/\b(custom script|python|internal tool)\b/i.test(text)) {
+      return { workaroundDesc: 'Custom internal script', workaroundType: 'internal_tool' };
     }
     if (/\b(email|inbox|manual|by hand)\b/i.test(text)) {
-      return 'Performing manual step-by-step checks via email inbox and manual browser bookmarks';
+      return { workaroundDesc: 'Manual checks via email inbox', workaroundType: 'manual' };
     }
-    return 'Manual human intervention and ad-hoc checklist routines';
+    return { workaroundDesc: 'Unknown/Manual', workaroundType: 'none' };
   }
 
   private detectTargetUser(text: string, override?: string): string {
@@ -156,7 +128,7 @@ export class ProblemExtractor {
     if (/\b(small business|smb|local business|store owner)\b/i.test(text)) return 'Small business operators and boutique service firms';
     if (/\b(developer|engineer|devops)\b/i.test(text)) return 'Software developers and technical project leads';
     if (/\b(sales|account executive|bdr|sdr)\b/i.test(text)) return 'B2B sales representatives and revenue managers';
-    return 'Small business owners and lean product teams';
+    return 'Knowledge workers';
   }
 
   private detectWorkflow(text: string, topic: string): string {
@@ -164,14 +136,28 @@ export class ProblemExtractor {
     if (/\b(invoice|payment|accounting)\b/i.test(text)) return 'Invoice generation → payment tracking → accounting ledger reconciliation';
     if (/\b(support|ticket|inquiry|customer)\b/i.test(text)) return 'Customer question triage → internal resolution → response dispatch';
     if (/\b(schedule|calendar|booking)\b/i.test(text)) return 'Availability check → appointment slot negotiation → reminder confirmation';
-    if (/\b(document|pdf|form)\b/i.test(text)) return 'Document intake → field extraction → ERP/CRM data ingestion';
+    if (/\b(document|pdf|form)\b/i.test(text)) return 'Document intake → field extraction → CRM ingestion';
     return `${topic} operational workflow`;
+  }
+
+  private detectTrigger(text: string): string {
+    if (/\b(new email|receive email|inbox)\b/i.test(text)) return 'Receiving an external email';
+    if (/\b(new customer|signup|onboarding)\b/i.test(text)) return 'A new user signing up';
+    if (/\b(end of month|monthly closing|invoice)\b/i.test(text)) return 'End of month billing cycle';
+    return 'An external request or data state change';
   }
 
   private detectFrequency(text: string): string {
     if (/\b(daily|every day|multiple times a day|constantly)\b/i.test(text)) return 'Daily (multiple times per day)';
     if (/\b(weekly|every week|each week|regularly)\b/i.test(text)) return 'Weekly (recurring routine)';
     if (/\b(monthly|end of month|monthly closing)\b/i.test(text)) return 'Monthly (periodic batch)';
-    return 'Insufficient evidence.';
+    return 'Unknown';
+  }
+
+  private detectCost(text: string): string {
+    if (/\b(hours|takes forever|all day|weekend)\b/i.test(text)) return 'Significant loss of productive hours';
+    if (/\b(pay|dollars|expensive|thousands)\b/i.test(text)) return 'Direct monetary cost via labor or errors';
+    return 'Unquantified friction';
   }
 }
+

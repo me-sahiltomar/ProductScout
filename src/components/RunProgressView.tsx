@@ -37,7 +37,7 @@ export const RunProgressView: React.FC<RunProgressViewProps> = ({ topic }) => {
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto py-10 px-4 space-y-6 animate-fade-in">
+    <div className="max-w-3xl mx-auto py-10 px-4 space-y-6 animate-fade-in">
       {/* Status Header */}
       <div className="text-center space-y-2">
         <div className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/[0.04] border border-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] text-white mx-auto">

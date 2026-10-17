@@ -23,7 +23,7 @@ export interface RunSummary {
   topic: string;
   timeframe: string;
   focus: string;
-  status: 'pending' | 'collecting' | 'analyzing' | 'completed' | 'failed';
+  status: string;
   is_reference?: boolean;
   sourcesCount: number;
   problemsCount: number;
@@ -411,6 +411,7 @@ export class ProductScoutRepository {
         weakSignals,
         reportMarkdown: runRow.report_markdown || '',
         error: runRow.error || undefined,
+        telemetry: (runRow as any).telemetry || undefined,
       };
     } catch (err: any) {
       console.error(`Supabase getRunById(${id}) error:`, err);
@@ -455,9 +456,10 @@ export class ProductScoutRepository {
         error: run.error || null,
         brief: (run.brief || run.config.brief) ? JSON.parse(JSON.stringify(run.brief || run.config.brief)) : null,
         adaptive_output_type: run.adaptiveOutputType || null,
+        telemetry: run.telemetry ? JSON.parse(JSON.stringify(run.telemetry)) : null,
         created_at: run.createdAt,
         updated_at: new Date().toISOString(),
-      });
+      } as any);
 
       if (runErr) {
         throw new Error(`Failed to persist research run to Supabase: ${runErr.message}`);
