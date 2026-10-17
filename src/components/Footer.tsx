@@ -83,17 +83,6 @@ export const Footer: React.FC<FooterProps> = ({
                   Living Changelog (v1.1)
                 </Link>
               </li>
-              <li>
-                <a
-                  href="https://productstudio.cevonx.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-400 hover:text-white transition-colors inline-flex items-center gap-1"
-                >
-                  <span>CevonX Product Studio</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
-              </li>
             </ul>
           </div>
 

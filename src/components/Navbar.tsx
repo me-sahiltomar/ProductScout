@@ -58,41 +58,24 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="sticky top-0 z-40 w-full border-b border-white/[0.08] bg-[#08080a]/90 backdrop-blur-xl">
       <div className="max-w-[1640px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 h-14 flex items-center justify-between gap-4">
         
-        {/* Left: Ecosystem & Product Brand */}
-        <div className="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
-          {!isWorkspaceRoute ? (
-            <a
-              href="https://productstudio.cevonx.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-zinc-400 hover:text-white transition-colors hidden sm:inline-flex items-center space-x-1"
-              title="CevonX Product Studio"
-            >
-              <span>← CevonX Product Studio</span>
-            </a>
-          ) : (
-            <Link
-              href="/"
-              className="text-xs text-zinc-400 hover:text-white transition-colors inline-flex items-center space-x-1"
-              title="Return to Public Opportunity Explorer"
-            >
-              <span>← Public Explorer</span>
-            </Link>
-          )}
-
-          <span className="text-zinc-600 hidden sm:inline select-none">|</span>
-
+        {/* Left: Clean Brand Unit */}
+        <div className="flex items-center space-x-2.5 shrink-0">
           <Link
             href={isWorkspaceRoute ? '/app' : '/'}
-            className="flex items-center space-x-2 cursor-pointer group select-none"
+            className="flex items-center space-x-2.5 cursor-pointer group select-none"
           >
-            <span className="font-bold text-sm tracking-tight text-white group-hover:text-zinc-100 transition-colors">
-              / ProductScout{isWorkspaceRoute ? ' Workspace' : ''}
-            </span>
-            <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-800/80">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>ACTIVE · v1.1</span>
-            </span>
+            <div className="flex items-center justify-center w-7 h-7 rounded-md bg-gradient-to-b from-white/10 to-white/[0.02] border border-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] text-white group-hover:border-white/20 transition-all duration-200">
+              <Radio className="w-3.5 h-3.5 text-zinc-200" />
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-sm tracking-tight text-white group-hover:text-zinc-100 transition-colors">
+                ProductScout
+              </span>
+              <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-800/80">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>ACTIVE · v1.1</span>
+              </span>
+            </div>
           </Link>
 
           {isRunning && (
