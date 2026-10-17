@@ -109,15 +109,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 Feature Updates ↓
               </a>
-              <a
-                href="https://sahiltomar.pro"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden sm:inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
-              >
-                <span>Architect: Sahil Tomar</span>
-                <span className="text-zinc-500">↗</span>
-              </a>
 
               <div className="h-4 w-px bg-white/[0.08] mx-1 hidden sm:block"></div>
 

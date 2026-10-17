@@ -40,16 +40,7 @@ export const Footer: React.FC<FooterProps> = ({
                 <Shield className="w-3 h-3 text-zinc-400" />
                 <span>Evidence-Backed Opportunity Intelligence</span>
               </span>
-              <span>•</span>
-              <a
-                href="https://sahiltomar.pro"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-white transition-colors inline-flex items-center space-x-1"
-              >
-                <span>Architect: Sahil Tomar</span>
-                <ExternalLink className="w-2.5 h-2.5" />
-              </a>
+
             </div>
           </div>
 
