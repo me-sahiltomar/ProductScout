@@ -63,12 +63,12 @@ interface BlueprintPreset {
 const BLUEPRINTS: BlueprintPreset[] = [
   {
     id: '7d_micro_saas',
-    name: '7-Day Micro-SaaS',
+    name: 'Focused Micro-SaaS',
     category: 'Rapid Builders',
     description: 'Ruthlessly scoped single-workflow tool for rapid weekend-to-week launch.',
     topic: 'Automated invoice discrepancy detection for freelancers',
     objective: 'find_micro_saas_opportunities',
-    intent: 'Find tight, painful operational friction that can be solved with a single deterministic workflow shipped in under 7 days.',
+    intent: 'Find tight, painful operational friction that can be solved with a single deterministic workflow shipped as a focused MVP.',
     targetUser: 'Freelancers & Boutique Agency Owners',
     targetCompany: 'SMB',
     industry: 'Financial & Professional Services',
@@ -708,7 +708,7 @@ export const NewResearchView: React.FC<NewResearchViewProps> = ({
               rows={2}
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              placeholder="e.g., Discover recurring operational complaints about manual reconciliations that could form a tight 7-day micro-SaaS or browser extension."
+              placeholder="e.g., Discover recurring operational complaints about manual reconciliations that could form a tight focused micro-SaaS or browser extension."
               className="w-full px-3 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
             />
           </div>

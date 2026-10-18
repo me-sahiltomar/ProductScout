@@ -60,7 +60,7 @@ export class ResearchPlanner {
     if (horizon === '7d') {
       questions.push({
         id: `q_horizon_${timestamp}_4`,
-        text: `What narrow, single-workflow friction point in ${subject} can be solved with a 7-day zero-setup micro utility?`,
+        text: `What narrow, single-workflow friction point in ${subject} can be solved with a focused zero-setup micro utility?`,
         importance: 'MEDIUM',
         status: 'OPEN',
         uncertaintyScore: 1.0,

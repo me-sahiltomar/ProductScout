@@ -26,13 +26,13 @@ export class AdaptiveEvaluator {
       if (opportunity.technicalComplexity === 'High') {
         feasibilityScore -= 35;
         horizonMatch = false;
-        feasibilityNotes.push('High technical complexity exceeds 7-day build horizon');
+        feasibilityNotes.push('High technical complexity exceeds focused MVP build horizon');
       } else if (opportunity.technicalComplexity === 'Medium') {
         feasibilityScore -= 15;
-        feasibilityNotes.push('Medium complexity requires strict MVP scope pruning for 7-day delivery');
+        feasibilityNotes.push('Medium complexity requires strict MVP scope pruning for focused delivery');
       } else {
         feasibilityScore += 10;
-        feasibilityNotes.push('Low technical complexity aligns with 7-day rapid execution');
+        feasibilityNotes.push('Low technical complexity aligns with rapid MVP execution');
       }
     } else if (buildHorizon === '2-3w') {
       if (opportunity.technicalComplexity === 'High') {

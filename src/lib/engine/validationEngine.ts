@@ -23,7 +23,7 @@ export class ValidationEngine {
       ? `${target.targetUser} (${target.targetCompany || 'SMB / Operators'})` 
       : opportunity.targetCustomer;
 
-    // 1. Solo developer / 7-day micro-SaaS
+    // 1. Solo developer / Focused micro-SaaS
     if (buildHorizon === '7d' || teamSize === 'Solo') {
       return {
         hypothesis: `If target operators are presented with a focused 60-second Loom demonstration solving their exact problem, at least 15% will request beta access or commit to a discovery call.`,

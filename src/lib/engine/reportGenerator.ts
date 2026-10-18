@@ -269,7 +269,7 @@ export class ReportGenerator {
     const evalData = opp.evaluation;
 
     return `
-### 7-Day Builder Brief: ${opp.name}
+### Focused Builder Brief: ${opp.name}
 **Primary User**: ${opp.targetCustomer}  
 **One Core Problem**: ${opp.userProblem}  
 **Target Product Type**: ${opp.opportunityType} | **Contextual Fit**: ${evalData?.contextualFitScore ?? 85}/100
@@ -277,7 +277,7 @@ export class ReportGenerator {
 #### 1. Core Workflow to Solve
 ${opp.coreWorkflow}
 
-#### 2. The 7-Day Scope (Strict Single-Workflow MVP)
+#### 2. The Focused MVP Scope (Strict Single-Workflow MVP)
 - [x] Single input trigger (e.g. paste URL, upload single file, or one webhook)
 - [x] Deterministic execution engine solving the central friction point
 - [x] Immediate actionable output with copy/download capability
@@ -530,7 +530,7 @@ ${evalData?.criticalUncertainties.map(u => `- ⚠️ ${u}`).join('\n') || '- Non
 
   private getOutputDocumentTitle(type: AdaptiveOutputType): string {
     switch (type) {
-      case 'builder_brief_7d': return '7-Day Builder Brief';
+      case 'builder_brief_7d': return 'Focused Builder Brief';
       case 'rapid_mvp_2_3w': return 'Rapid MVP Brief (2–3 Weeks)';
       case 'product_brief_30d': return '30-Day Product Brief';
       case 'product_plan_90d': return '90-Day Product Plan';
